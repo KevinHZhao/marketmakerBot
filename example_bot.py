@@ -161,8 +161,6 @@ async def on_message(message):
     global anarchy
     global daily_counter
     
-    bonus = False
-    
     if random.randrange(100) < prob_coin and not seeking_substr and message.guild:
         economy = sqlite3.connect("marketmaker.db")
         cur = economy.cursor()
@@ -204,6 +202,7 @@ async def on_message(message):
                 daily_counter -=1
             else:
                 announce = await message.channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+                bonus = False
         
         economy.close()
         

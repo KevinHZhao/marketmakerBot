@@ -112,11 +112,13 @@ async def on_message(message):
 @tasks.loop(time=time)
 async def tax():
     print("Taxation time!")
+    channel = bot.get_channel(558408620476203021)
     global wallets
     global bank_money
     for k, v in wallets.items():
         bank_money += math.floor(0.04*wallets[k])
         wallets[k] -= math.floor(0.04*wallets[k])
+    await channel.send(f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!")
         
 @bot.hybrid_command()
 async def wallet(ctx):

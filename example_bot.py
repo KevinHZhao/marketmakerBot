@@ -45,6 +45,7 @@ with open("substr_250.txt", 'r') as f:
 seeking_substr = ""
 victim = ""
 anarchy = False
+daily_counter = 3
 
 utc = datetime.timezone.utc
 time = datetime.time(hour = 5, minute = 0, tzinfo = utc)
@@ -158,6 +159,9 @@ async def on_message(message):
     global seeking_substr
     global victim
     global anarchy
+    global daily_counter
+    
+    bonus = False
     
     if random.randrange(100) < prob_coin and not seeking_substr and message.guild:
         economy = sqlite3.connect("marketmaker.db")
@@ -194,7 +198,12 @@ async def on_message(message):
             announce = await message.channel.send(f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim.mention}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
         else:
             coin_value = random.randrange(1, math.ceil(bank_money/6 + 10))
-            announce = await message.channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+            if daily_counter > 0 and random.randrange(10) == 9:
+                announce = await message.channel.send(f":dollar: Bonus Coins :dollar: have spawned,, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+                bonus = True
+                daily_counter -=1
+            else:
+                announce = await message.channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
         
         economy.close()
         
@@ -224,7 +233,11 @@ async def on_message(message):
                 await wallet_transfer(victim, msg.author, math.ceil(coin_value/2), message.channel)
                 await wallet_transfer(victim, "BANK", math.floor(coin_value/2), message.channel)
         else:
-            await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
+            if bonus:
+                await message.channel.send(f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
+                await bonus_transfer(msg.author, 100)
+            else:
+                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
             await wallet_transfer("BANK", msg.author, coin_value, message.channel)
         
         economy = sqlite3.connect("marketmaker.db")
@@ -237,6 +250,10 @@ async def on_message(message):
 @tasks.loop(time=time)
 async def tax():
     print("Taxation time!")
+    
+    global daily_counter
+    daily_counter = 3
+    
     channel = bot.get_channel(int(os.getenv('CHANNEL')))
     
     economy = sqlite3.connect("marketmaker.db")

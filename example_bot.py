@@ -23,7 +23,7 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 prob_coin = 2
 total_money = 100000
 bank_money = total_money
-coin_value = random.randrange(1, math.ceil(bank_money/200 + 10))
+coin_value = random.randrange(1, math.ceil(bank_money/6 + 10))
 with open("substr_250.txt", 'r') as f:
     good_substrings = [line.rstrip('\n') for line in f]
 seeking_substr = ""
@@ -60,9 +60,9 @@ async def on_message(message):
     
     if random.randrange(100) < prob_coin and not seeking_substr and message.guild:   
         if anarchy:
-            anarchy = bank_money > total_money/50
+            anarchy = bank_money > total_money/5
         else:
-            anarchy = bank_money < total_money/500
+            anarchy = bank_money < total_money/90
         
         seeking_substr = random.choice(good_substrings)
         if anarchy:
@@ -70,7 +70,7 @@ async def on_message(message):
             coin_value = random.randrange(1, math.ceil(wallets[victim]/4 + 1))
             announce = await message.channel.send(f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim.mention}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
         else:
-            coin_value = random.randrange(1, math.ceil(bank_money/200 + 10))
+            coin_value = random.randrange(1, math.ceil(bank_money/6 + 10))
             announce = await message.channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
         
         def check(m):

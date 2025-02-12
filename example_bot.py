@@ -314,6 +314,8 @@ async def send(ctx, receiver, amount):
 async def force_tax(ctx):
     if dev:
         await tax()
+    else:
+        await ctx.send("No.")
 
 @bot.hybrid_command()
 async def cheat(ctx):
@@ -328,7 +330,7 @@ async def cheat(ctx):
         await wallet_transfer("BANK", ctx.author, math.ceil(0.99*bank_money), ctx.channel)
         await ctx.send("Cheat successful!")
     else:
-        result = wallet_transfer(ctx.author, "BANK", 5, ctx.channel)
-        await ctx.send(f"ctx.author, you have successfully donated {result}$ to the bank, good job!")
+        result = await wallet_transfer(ctx.author, "BANK", 5, ctx.channel)
+        await ctx.send(f"{ctx.author}, you have successfully donated {result}$ to the bank, good job!")
 
 bot.run(BOT_TOKEN)

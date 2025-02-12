@@ -236,6 +236,7 @@ async def on_message(message):
             if bonus:
                 await message.channel.send(f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
                 await bonus_transfer(msg.author, 100)
+                bonus = False
             else:
                 await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
             await wallet_transfer("BANK", msg.author, coin_value, message.channel)

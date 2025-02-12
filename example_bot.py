@@ -95,9 +95,9 @@ async def wallet_transfer(sender, receiver, amount, channel):
     if sender == "TOTAL" or receiver == "TOTAL":
         raise Exception ("TOTAL entered for sender/receiver!")
     
-    if sender not in ("BANK"):
+    if sender != "BANK":
         sendid = sender.id
-    if receiver not in ("BANK"):
+    if receiver != ("BANK"):
         recid = receiver.id
     
     if sender == "BANK":

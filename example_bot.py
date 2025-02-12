@@ -22,7 +22,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 prob_coin = int(os.getenv('PROB'))
-dev = os.getenv('DEV_MODE')
+dev = bool(int(os.getenv('DEV_MODE')))
 
 starting_money = 100000
 #Initialize the economy if it does not exist
@@ -56,6 +56,36 @@ bot = commands.Bot(command_prefix='##', intents=intents)
 
 def convert_mention_to_id(mention):
     return int(mention[1:][:len(mention)-2].replace("@","").replace("!",""))
+
+async def bonus_transfer(receiver, amount):
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    if receiver not in ("BANK", "TOTAL"):
+        recid = receiver.id
+    if receiver == "BANK":
+        recid = "BANK"
+    if receiver == "TOTAL":
+        recid = "TOTAL"
+        
+    cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))
+    if cur.fetchone() is None:
+        cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (recid,))
+    
+    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (recid,))
+    receiver_cash = cur.fetchone()
+    receiver_cash = receiver_cash[0]
+    
+    cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("TOTAL",))
+    total_cash = cur.fetchone()
+    total_cash = receiver_cash[0]
+    
+    cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid))
+    cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (total_cash + amount, "TOTAL"))
+    
+    economy.commit()
+    economy.close()
+    print(f"Gave {amount} to {receiver} as a bonus.")
 
 async def wallet_transfer(sender, receiver, amount, channel):
     economy = sqlite3.connect("marketmaker.db")
@@ -187,9 +217,12 @@ async def on_message(message):
         await msg.add_reaction("👍")
         await announce.delete()
         if anarchy:
-            await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
-            await wallet_transfer(victim, msg.author, math.ceil(coin_value/2), message.channel)
-            await wallet_transfer(victim, "BANK", math.floor(coin_value/2), message.channel)
+            if victim == msg.author:
+                await message.channel.send(f"{msg.author.mention} got it, so their money will be left alone.", delete_after = 10)
+            else:
+                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
+                await wallet_transfer(victim, msg.author, math.ceil(coin_value/2), message.channel)
+                await wallet_transfer(victim, "BANK", math.floor(coin_value/2), message.channel)
         else:
             await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
             await wallet_transfer("BANK", msg.author, coin_value, message.channel)
@@ -279,7 +312,8 @@ async def send(ctx, receiver, amount):
         
 @bot.hybrid_command()
 async def force_tax(ctx):
-    await tax()
+    if dev:
+        await tax()
 
 @bot.hybrid_command()
 async def cheat(ctx):

@@ -7,7 +7,8 @@ import random
 import asyncio
 import math
 from collections import defaultdict
-from discord.ext import commands
+import datetime
+from discord.ext import tasks, commands
 
 import enchant
 dict = enchant.Dict("en_CA")
@@ -30,6 +31,9 @@ seeking_substr = ""
 victim = ""
 anarchy = False
 
+utc = datetime.timezone.utc
+time = datetime.time(hour = 5, minute = 0, tzinfo = utc)
+
 used_words = []
 wallets = defaultdict(int)
 
@@ -42,6 +46,7 @@ bot = commands.Bot(command_prefix='##', intents=intents)
 async def on_ready():
     print(f'We have logged in as {bot.user}')
     print(bot.guilds)
+    tax.start()
 
 @bot.event
 async def on_message(message):
@@ -86,7 +91,7 @@ async def on_message(message):
                 bank_money += coin_value
                 wallets[victim] -= coin_value
             else:
-                await message.channel.send("Time's up!  No one claimed the :coin: Coins :coin: so it has been returned to the bank...", delete_after = 10)
+                await message.channel.send("Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...", delete_after = 10)
             seeking_substr = ""
             return
         
@@ -103,6 +108,15 @@ async def on_message(message):
             bank_money -= coin_value
         used_words.append(msg.content)
         seeking_substr = ""
+        
+@tasks.loop(time=time)
+async def tax():
+    print("Taxation time!")
+    global wallets
+    global bank_money
+    for k, v in wallets.items():
+        bank_money += math.floor(0.04*wallets[k])
+        wallets[k] -= math.floor(0.04*wallets[k])
         
 @bot.hybrid_command()
 async def wallet(ctx):

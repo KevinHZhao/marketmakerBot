@@ -5,14 +5,15 @@ import json
 import itertools
 import string
 
-min_words = 250
+max_words = 250
+min_words = 100
 
 letters = list(string.ascii_lowercase)
 substrings = ["".join(i) for i in itertools.product(letters, repeat = 2)] + ["".join(i) for i in itertools.product(letters, repeat = 3)]
 
 good_substrings = []
 for i in substrings:
-    if sum(i in s for s in word_list) >= min_words:
+    if min_words <= sum(i in s for s in word_list) < max_words:
         good_substrings.append(i)
 
 with open(f"substr_{min_words}.txt", "w") as f:

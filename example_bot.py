@@ -42,6 +42,9 @@ if not os.path.exists("marketmaker.db"):
 
 with open("substr_250.txt", 'r') as f:
     good_substrings = [line.rstrip('\n') for line in f]
+    
+with open("substr_100.txt", 'r') as f:
+    hard_substrings = [line.rstrip('\n') for line in f]
 seeking_substr = ""
 victim = ""
 anarchy = False
@@ -66,8 +69,6 @@ async def bonus_transfer(receiver, amount):
         recid = receiver.id
     if receiver == "BANK":
         recid = "BANK"
-    if receiver == "TOTAL":
-        recid = "TOTAL"
         
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))
     if cur.fetchone() is None:
@@ -91,20 +92,18 @@ async def bonus_transfer(receiver, amount):
 async def wallet_transfer(sender, receiver, amount, channel):
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
+    if sender == "TOTAL" or receiver == "TOTAL":
+        raise Exception ("TOTAL entered for sender/receiver!")
     
-    if sender not in ("BANK", "TOTAL"):
+    if sender not in ("BANK"):
         sendid = sender.id
-    if receiver not in ("BANK", "TOTAL"):
+    if receiver not in ("BANK"):
         recid = receiver.id
     
     if sender == "BANK":
         sendid = "BANK"
     if receiver == "BANK":
         recid = "BANK"
-    if sender == "TOTAL":
-        sendid = "TOTAL"
-    if receiver == "TOTAL":
-        recid = "TOTAL"
     
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (sendid,))
     if cur.fetchone is None:
@@ -119,7 +118,17 @@ async def wallet_transfer(sender, receiver, amount, channel):
     sender_cash = sender_cash[0]
     
     if sender_cash < amount:
-        await channel.send(f"{sender.mention} somehow doesn't have enough cash, so we'll just send all of their {sender_cash}$ to {receiver.mention}.")
+        if sender == "BANK":
+            sendmen = "The bank"
+        else:
+            sendmen = sender.mention
+        
+        if receiver == "BANK":
+            recmen = "the bank"
+        else:
+            recmen = receiver.mention
+        
+        await channel.send(f"{sendmen} somehow doesn't have enough cash, so we'll just send all of their {sender_cash}$ to {recmen}.")
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (0, sendid))
         
         cur.execute("SELECT cash FROM wallets WHERE ID = ?", (recid,))
@@ -197,6 +206,8 @@ async def on_message(message):
         else:
             coin_value = random.randrange(1, math.ceil(bank_money/6 + 10))
             if daily_counter > 0 and random.randrange(10) == 9:
+                print("BONUS TIME")
+                seeking_substr = random.choice(hard_substrings)
                 announce = await message.channel.send(f":dollar: Bonus Coins :dollar: have spawned,, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
                 bonus = True
                 daily_counter -=1

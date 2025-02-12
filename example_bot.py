@@ -348,6 +348,6 @@ async def cheat(ctx):
         await ctx.send("Cheat successful!")
     else:
         result = await wallet_transfer(ctx.author, "BANK", 5, ctx.channel)
-        await ctx.send(f"{ctx.author}, you have successfully donated {result}$ to the bank, good job!")
+        await ctx.send(f"{ctx.author.mention}, you have successfully donated {result}$ to the bank, good job!")
 
 bot.run(BOT_TOKEN)

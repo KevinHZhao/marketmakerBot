@@ -358,6 +358,9 @@ async def leaderboard(ctx):
     LIMIT 10
     """)
     rows = cur.fetchall()
+    if rows is None:
+        await ctx.send("Nobody on the leaderboard!")
+        return
     
     board = ""
     for (row, i) in zip(rows, range(len(rows))):

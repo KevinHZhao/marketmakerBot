@@ -294,7 +294,7 @@ async def tax():
 @bot.hybrid_command()
 async def wallet(ctx, target: discord.User = None):
     if target is None:
-        target = ctx.author.id
+        target = ctx.author
     
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()

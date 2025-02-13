@@ -292,17 +292,20 @@ async def tax():
     await channel.send(f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!")
         
 @bot.hybrid_command()
-async def wallet(ctx):
+async def wallet(ctx, target: discord.User = None):
+    if target is None:
+        target = ctx.author.id
+    
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     
-    cur.execute("INSERT OR IGNORE INTO wallets (ID, cash) VALUES (?, 0)", (ctx.author.id,))
+    cur.execute("INSERT OR IGNORE INTO wallets (ID, cash) VALUES (?, 0)", (target.id,))
     
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (ctx.author.id,))
+    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (target.id,))
     money = cur.fetchone()[0]
     
     economy.close()
-    await ctx.send(f"{ctx.author.mention} has {money}$ in their wallet!")
+    await ctx.send(f"{target.mention} has {money}$ in their wallet!")
 
 @bot.hybrid_command()
 async def used(ctx):

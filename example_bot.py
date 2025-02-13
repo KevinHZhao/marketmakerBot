@@ -65,7 +65,7 @@ async def bonus_transfer(receiver, amount):
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     
-    if receiver not in ("BANK", "TOTAL"):
+    if receiver != "BANK":
         recid = receiver.id
     if receiver == "BANK":
         recid = "BANK"
@@ -80,7 +80,7 @@ async def bonus_transfer(receiver, amount):
     
     cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("TOTAL",))
     total_cash = cur.fetchone()
-    total_cash = receiver_cash[0]
+    total_cash = total_cash[0]
     
     cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid))
     cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (total_cash + amount, "TOTAL"))

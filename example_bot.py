@@ -354,7 +354,7 @@ async def leaderboard(ctx):
     
     board = ""
     for (row, i) in zip(rows, range(len(rows))):
-        board += f"{i}. {bot.fetch_user(row[0])}: {row[1]}$\n"
+        board += f"{i}. {bot.get_user(row[0])}: {row[1]}$\n"
     
     await ctx.send(board)
     

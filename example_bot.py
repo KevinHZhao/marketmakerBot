@@ -331,7 +331,7 @@ async def bank(ctx):
 async def send(ctx, receiver, amount):
     try:
         if int(amount) > 0:
-            if bot.fetch_user(convert_mention_to_id(receiver)).bot:
+            if await bot.fetch_user(convert_mention_to_id(receiver)).bot:
                 result = await wallet_transfer(ctx.author, "BANK", int(amount), ctx.channel)
                 await ctx.send(f"{ctx.author.mention}, you're only supposed to use this command with non-bots...  Don't worry, we know you want to be generous, so your {result}$ has been sent to the bank!")
             else:

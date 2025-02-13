@@ -221,7 +221,7 @@ async def on_message(message):
         economy.close()
         
         def check(m):
-            if m.content in used_words:
+            if str.lower(m.content) in used_words:
                 m.add_reaction("❌")
             return not m.author.bot and dict.check(str.lower(m.content)) and seeking_substr in m.content and m.channel == message.channel and not m.content in used_words
         
@@ -240,23 +240,23 @@ async def on_message(message):
         await announce.delete()
         if anarchy:
             if victim == msg.author:
-                await message.channel.send(f"{msg.author.mention} got it, so their money will be left alone.", delete_after = 10)
+                await message.channel.send(f"{msg.author.mention} got it, so their money will be left alone.  `{str.lower(msg.content)}` has now been added to the list of used words.", delete_after = 10)
             else:
-                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
+                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{str.lower(msg.content)}` has now been added to the list of used words.", delete_after = 10)
                 await wallet_transfer(victim, msg.author, math.ceil(coin_value/2), message.channel)
                 await wallet_transfer(victim, "BANK", math.floor(coin_value/2), message.channel)
         else:
             if bonus:
-                await message.channel.send(f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
+                await message.channel.send(f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{str.lower(msg.content)}` has now been added to the list of used words.", delete_after = 10)
                 await bonus_transfer(msg.author, 100)
                 bonus = False
             else:
-                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content}` has now been added to the list of used words.", delete_after = 10)
+                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{str.lower(msg.content)}` has now been added to the list of used words.", delete_after = 10)
             await wallet_transfer("BANK", msg.author, coin_value, message.channel)
         
         economy = sqlite3.connect("marketmaker.db")
         cur = economy.cursor()
-        cur.execute("INSERT INTO used_words VALUES (?)", (msg.content,))
+        cur.execute("INSERT INTO used_words VALUES (?)", (str.lower(msg.content),))
         economy.commit()
         economy.close()
         seeking_substr = ""
@@ -345,7 +345,7 @@ async def send(ctx, receiver, amount):
             await ctx.send("Error, please enter a positive, integer amount.")
     except ValueError:
         await ctx.send("Error, please enter a valid amount.")
-        
+
 @bot.hybrid_command()
 async def leaderboard(ctx):
     economy = sqlite3.connect("marketmaker.db")
@@ -354,12 +354,11 @@ async def leaderboard(ctx):
     cur.execute("""
     SELECT ID, cash
     FROM wallets
-    WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 0    
+    WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 0
     ORDER BY cash DESC
     LIMIT 10
     """)
     rows = cur.fetchall()
-    print(rows)
     if not rows:
         await ctx.send("Nobody on the leaderboard!")
         return

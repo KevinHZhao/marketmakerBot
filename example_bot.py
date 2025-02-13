@@ -223,7 +223,7 @@ async def on_message(message):
         def check(m):
             if str.lower(m.content) in used_words:
                 m.add_reaction("❌")
-            return not m.author.bot and dict.check(str.lower(m.content)) and seeking_substr in m.content and m.channel == message.channel and not m.content in used_words
+            return not m.author.bot and dict.check(str.lower(m.content)) and seeking_substr in str.lower(m.content) and m.channel == message.channel and not str.lower(m.content) in used_words
         
         try:
             msg = await bot.wait_for('message', check=check, timeout=30)

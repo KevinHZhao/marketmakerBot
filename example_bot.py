@@ -97,7 +97,7 @@ async def wallet_transfer(sender, receiver, amount, channel):
     
     if sender != "BANK":
         sendid = sender.id
-    if receiver != ("BANK"):
+    if receiver != "BANK":
         recid = receiver.id
     
     if sender == "BANK":
@@ -337,6 +337,27 @@ async def send(ctx, receiver, amount):
             await ctx.send("Error, please enter a positive, integer amount.")
     except ValueError:
         await ctx.send("Error, please enter a valid amount.")
+        
+@bot.hybrid_command()
+async def leaderboard(ctx):
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    cur.execute("""
+    SELECT ID, cash
+    FROM wallets
+    WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 0    
+    ORDER BY cash DESC
+    LIMIT 10
+    """)
+    rows = cur.fetchall()
+    
+    board = ""
+    for (row, i) in zip(rows, range(len(rows))):
+        board += f"{i}. {bot.fetch_user(row[0])}: {row[1]}$\n"
+    
+    await ctx.send(board)
+    
         
 @bot.hybrid_command()
 async def force_tax(ctx):

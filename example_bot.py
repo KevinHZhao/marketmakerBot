@@ -160,7 +160,7 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author.bot:
         return
     
     await bot.process_commands(message)
@@ -331,8 +331,12 @@ async def bank(ctx):
 async def send(ctx, receiver, amount):
     try:
         if int(amount) > 0:
-            result = await wallet_transfer(ctx.author, await bot.fetch_user(convert_mention_to_id(receiver)), int(amount), ctx.channel)
-            await ctx.send(f"{receiver}, {ctx.author.mention} has graciously sent you {result}$!")
+            if bot.fetch_user(convert_mention_to_id(receiver)).bot:
+                result = await wallet_transfer(ctx.author, "BANK", int(amount), ctx.channel)
+                await ctx.send(f"{ctx.author.mention}, you're only supposed to use this command with non-bots...  Don't worry, we know you want to be generous, so your {result}$ has been sent to the bank!")
+            else:
+                result = await wallet_transfer(ctx.author, await bot.fetch_user(convert_mention_to_id(receiver)), int(amount), ctx.channel)
+                await ctx.send(f"{receiver}, {ctx.author.mention} has graciously sent you {result}$!")
         else:
             await ctx.send("Error, please enter a positive, integer amount.")
     except ValueError:

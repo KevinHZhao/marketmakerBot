@@ -107,7 +107,7 @@ async def wallet_transfer(sender, receiver, amount, channel):
         recid = "BANK"
     
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (sendid,))
-    if cur.fetchone is None:
+    if cur.fetchone() is None:
         print(f"{sender} wallet created!")
         cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (sendid,))
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))

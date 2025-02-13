@@ -358,7 +358,8 @@ async def leaderboard(ctx):
     LIMIT 10
     """)
     rows = cur.fetchall()
-    if rows is None:
+    print(rows)
+    if not rows:
         await ctx.send("Nobody on the leaderboard!")
         return
     

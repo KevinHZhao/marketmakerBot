@@ -393,4 +393,14 @@ async def cheat(ctx):
         result = await wallet_transfer(ctx.author, "BANK", 5, ctx.channel)
         await ctx.send(f"{ctx.author.mention}, you have successfully donated {result}$ to the bank, good job!")
 
+@bot.command()
+async def sync(ctx):
+    print("sync command")
+    author = bot.get_channel(int(os.getenv('AUTHOR')))
+    if ctx.author.id == author:
+        await bot.tree.sync()
+        await ctx.send('Command tree synced.')
+    else:
+        await ctx.send('You must be the owner to use this command!')
+
 bot.run(BOT_TOKEN)

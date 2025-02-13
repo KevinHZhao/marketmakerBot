@@ -314,7 +314,12 @@ async def used(ctx):
     used_words = [row[0] for row in used_word_rows]
     
     economy.close()
-    await ctx.send(f"{used_words}")
+    
+    words_string = ""
+    for word in used_words:
+        words_string += "`" + word + "`, "
+    words_string = words_string[:-2] + "."
+    await ctx.send(words_string)
     
 @bot.hybrid_command()
 async def bank(ctx):

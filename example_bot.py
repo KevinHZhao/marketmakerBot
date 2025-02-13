@@ -72,6 +72,7 @@ async def bonus_transfer(receiver, amount):
         
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))
     if cur.fetchone() is None:
+        print(f"{receiver} wallet created!")
         cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (recid,))
     
     cur.execute("SELECT cash FROM wallets WHERE ID = ?", (recid,))
@@ -107,14 +108,15 @@ async def wallet_transfer(sender, receiver, amount, channel):
     
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (sendid,))
     if cur.fetchone is None:
+        print(f"{sender} wallet created!")
         cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (sendid,))
     cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))
     if cur.fetchone() is None:
+        print(f"{receiver} wallet created!")
         cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (recid,))
     
     cur.execute("SELECT cash FROM wallets WHERE ID = ?", (sendid,))
     sender_cash = cur.fetchone()
-    
     sender_cash = sender_cash[0]
     
     if sender_cash < amount:

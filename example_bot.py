@@ -173,9 +173,9 @@ async def on_message(message) -> None:
         used_words = used_words_backend()
         
         if anarchy:
-            anarchy = bank_money > total_money/5
+            anarchy = bank_money < total_money/5
         else:
-            anarchy = bank_money < total_money/90
+            anarchy = bank_money > total_money/90
         
         seeking_substr = random.choice(good_substrings)
         if anarchy:

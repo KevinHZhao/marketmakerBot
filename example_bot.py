@@ -58,7 +58,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='##', intents=intents)
 
-async def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int):
+async def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) -> None:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     
@@ -157,14 +157,14 @@ def used_words_backend() -> List[str]:
     return used_words
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     print(f'We have logged in as {bot.user}')
     print(bot.guilds)
     tax.start()
     await bot.tree.sync()
 
 @bot.event
-async def on_message(message):
+async def on_message(message) -> None:
     if message.author.bot:
         return
     
@@ -280,7 +280,7 @@ async def on_message(message):
         seeking_substr = ""
         
 @tasks.loop(time=time)
-async def tax():
+async def tax() -> None:
     print("Taxation time!")
     
     global daily_counter
@@ -306,14 +306,20 @@ async def tax():
     await channel.send(f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!")
         
 @bot.hybrid_command()
-async def wallet(ctx, target: discord.User = None):
+async def wallet(ctx, target: discord.User = None) -> None:
+    """
+    Displays a selected user's wallet.  One argument is accepted, which is the user who's wallet should be displayed.  If no arguments are given, then displays the wallet of the user who used the command.
+    """
     if target is None:
         target = ctx.author
     money = wallet_backend(target.id)
     await ctx.send(f"{target} has {money}$ in their wallet!")
 
 @bot.hybrid_command()
-async def used(ctx):
+async def used(ctx) -> None:
+    """
+    Displays all previously used words in the game.
+    """
     used_words = used_words_backend()
     
     words_string = ""
@@ -323,13 +329,19 @@ async def used(ctx):
     await ctx.send(words_string)
     
 @bot.hybrid_command()
-async def bank(ctx):
+async def bank(ctx) -> None:
+    """
+    Displays the current money in the bank and the total money in the economy.
+    """
     bank_money = wallet_backend("BANK")
     total_money = wallet_backend("TOTAL")
     await ctx.send(f"The bank currently has {bank_money}$, out of a total of {total_money}$ in the economy!")
 
 @bot.hybrid_command()
-async def send(ctx, receiver: discord.User, amount: int):
+async def send(ctx, receiver: discord.User, amount: int) -> None:
+    """
+    Sends a user an amount of money.  First argument is the user to send money to, and second argument is the amount to be sent.
+    """
     try:
         if int(amount) > 0:
             if receiver.bot:
@@ -344,7 +356,10 @@ async def send(ctx, receiver: discord.User, amount: int):
         await ctx.send("Error, please enter a valid amount.")
 
 @bot.hybrid_command()
-async def leaderboard(ctx):
+async def leaderboard(ctx) -> None:
+    """
+    Displays a leaderboard of up to ten users based on their current wallet.
+    """
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     
@@ -368,14 +383,20 @@ async def leaderboard(ctx):
     
         
 @bot.hybrid_command()
-async def force_tax(ctx):
+async def force_tax(ctx) -> None:
+    """
+    Developer command, forces taxation on all users.
+    """
     if dev:
         await tax()
     else:
         await ctx.send("No.")
 
 @bot.hybrid_command()
-async def cheat(ctx):
+async def cheat(ctx) -> None:
+    """
+    Developer command, steals 99% of the bank's money and deposits it in user's wallet.
+    """
     if dev:
         bank_money = wallet_backend("BANK")
         await wallet_transfer("BANK", ctx.author, math.ceil(0.99*bank_money), ctx.channel)

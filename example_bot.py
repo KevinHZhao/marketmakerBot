@@ -6,9 +6,9 @@ import sqlite3
 import random
 import asyncio
 import math
-from collections import defaultdict
 import datetime
 from discord.ext import tasks, commands
+from typing import Union, Literal, List
 
 import enchant
 dict = enchant.Dict("en_CA")
@@ -58,10 +58,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix='##', intents=intents)
 
-def convert_mention_to_id(mention):
-    return int(mention[1:][:len(mention)-2].replace("@","").replace("!",""))
-
-async def bonus_transfer(receiver, amount):
+async def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int):
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     
@@ -70,18 +67,8 @@ async def bonus_transfer(receiver, amount):
     if receiver == "BANK":
         recid = "BANK"
         
-    cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))
-    if cur.fetchone() is None:
-        print(f"{receiver} wallet created!")
-        cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (recid,))
-    
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (recid,))
-    receiver_cash = cur.fetchone()
-    receiver_cash = receiver_cash[0]
-    
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("TOTAL",))
-    total_cash = cur.fetchone()
-    total_cash = total_cash[0]
+    receiver_cash = wallet_backend(recid)
+    total_cash = wallet_backend("TOTAL")
     
     cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid))
     cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (total_cash + amount, "TOTAL"))
@@ -90,7 +77,7 @@ async def bonus_transfer(receiver, amount):
     economy.close()
     print(f"Gave {amount} to {receiver} as a bonus.")
 
-async def wallet_transfer(sender, receiver, amount, channel):
+async def wallet_transfer(sender: Union[discord.User, Literal["BANK", "TOTAL"]], receiver: Union[discord.User, Literal["BANK", "TOTAL"]], amount: int, channel: discord.textChannel) -> int:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     if sender == "TOTAL" or receiver == "TOTAL":
@@ -105,19 +92,8 @@ async def wallet_transfer(sender, receiver, amount, channel):
         sendid = "BANK"
     if receiver == "BANK":
         recid = "BANK"
-    
-    cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (sendid,))
-    if cur.fetchone() is None:
-        print(f"{sender} wallet created!")
-        cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (sendid,))
-    cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (recid,))
-    if cur.fetchone() is None:
-        print(f"{receiver} wallet created!")
-        cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (recid,))
-    
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (sendid,))
-    sender_cash = cur.fetchone()
-    sender_cash = sender_cash[0]
+        
+    sender_cash = wallet_backend(sendid)
     
     if sender_cash < amount:
         if sender == "BANK":
@@ -133,18 +109,16 @@ async def wallet_transfer(sender, receiver, amount, channel):
         await channel.send(f"{sendmen} somehow doesn't have enough cash, so we'll just send all of their {sender_cash}$ to {recmen}.")
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (0, sendid))
         
-        cur.execute("SELECT cash FROM wallets WHERE ID = ?", (recid,))
-        receiver_cash = cur.fetchone()
-        receiver_cash = receiver_cash[0]
+        economy.commit()
+        receiver_cash = wallet_backend(recid)
         
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + sender_cash, recid))
         result = sender_cash
     else:
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (sender_cash - amount, sendid))
         
-        cur.execute("SELECT cash FROM wallets WHERE ID = ?", (recid,))
-        receiver_cash = cur.fetchone()
-        receiver_cash = receiver_cash[0]
+        economy.id()
+        receiver_cash = wallet_backend(recid)
         
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid))
         result = amount
@@ -153,6 +127,34 @@ async def wallet_transfer(sender, receiver, amount, channel):
     economy.close()
     print(f"Transferred {result} from {sender} to {receiver}.")
     return result
+
+def wallet_backend(target_id: Union[int, Literal["BANK", "TOTAL"]]) -> int:
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (target_id,))
+    if cur.fetchone() is None:
+        print(f"{target_id} wallet created!")
+        cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (target_id,))
+    
+    cur.execute("INSERT OR IGNORE INTO wallets (ID, cash) VALUES (?, 0)", (target_id,))
+    
+    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (target_id,))
+    money = cur.fetchone()[0]
+    
+    economy.close()
+    return money
+
+def used_words_backend() -> List[str]:
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    cur.execute("SELECT word FROM used_words")
+    used_word_rows = cur.fetchall()
+    used_words = [row[0] for row in used_word_rows]
+    
+    economy.close()
+    return used_words
 
 @bot.event
 async def on_ready():
@@ -174,18 +176,12 @@ async def on_message(message):
     global daily_counter
     
     if random.randrange(100) < prob_coin and not seeking_substr and message.guild:
-        economy = sqlite3.connect("marketmaker.db")
-        cur = economy.cursor()
         
-        cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("BANK",))
-        bank_money = cur.fetchone()[0]
+        bank_money = wallet_backend("BANK")
         
-        cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("TOTAL",))
-        total_money = cur.fetchone()[0]
+        total_money = wallet_backend("TOTAL")
         
-        cur.execute("SELECT word FROM used_words")
-        used_word_rows = cur.fetchall()
-        used_words = [row[0] for row in used_word_rows]
+        used_words = used_words_backend()
         
         if anarchy:
             anarchy = bank_money > total_money/5
@@ -194,6 +190,9 @@ async def on_message(message):
         
         seeking_substr = random.choice(good_substrings)
         if anarchy:
+            economy = sqlite3.connect("marketmaker.db")
+            cur = economy.cursor()
+            
             cur.execute("""
             SELECT ID, cash
             FROM wallets
@@ -203,6 +202,7 @@ async def on_message(message):
             victim_row = random.choice(rows)
             victim = await bot.fetch_user(victim_row[0])
             victim_money = victim_row[1]
+            economy.close()
             
             coin_value = random.randrange(1, math.ceil(victim_money/4 + 1))
             announce = await message.channel.send(f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim.mention}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
@@ -218,15 +218,30 @@ async def on_message(message):
                 announce = await message.channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
                 bonus = False
         
-        economy.close()
-        
         def check(m):
-            if str.lower(m.content) in used_words:
-                m.add_reaction("❌")
-            return not m.author.bot and dict.check(str.lower(m.content)) and seeking_substr in str.lower(m.content) and m.channel == message.channel and not str.lower(m.content) in used_words
+            return not m.author.bot and dict.check(m.content.lower) and seeking_substr in m.content.lower and m.channel == message.channel
         
+        end_time = discord.utils.utcnow() + discord.timedelta(seconds=30)
+
         try:
-            msg = await bot.wait_for('message', check=check, timeout=30)
+            # Keep listening for messages until 30 seconds have passed or a 👍 reaction is given
+            while discord.utils.utcnow() < end_time:
+                try:
+                    # Wait for a message (1 second timeout for each check)
+                    msg = await bot.wait_for('message', check=check, timeout=1.0)
+
+                    # If the message is in used_words, react with ❌ and continue checking
+                    if msg.content.lower() in used_words:
+                        await msg.add_reaction("❌")
+                    else:
+                        break  # End the game when a valid message is found
+
+                except asyncio.TimeoutError:
+                    continue  # If no new message, continue the loop
+
+            # If 30 seconds have passed and no valid message was found, notify timeout
+            if discord.utils.utcnow() >= end_time:
+                raise asyncio.TimeoutError()
         except asyncio.TimeoutError:
             if anarchy:
                 await message.channel.send(f"Time's up!  No one claimed the :coin: Coins :coin: so {victim.mention}'s {coin_value}$ are going to the bank!", delete_after = 10)
@@ -283,11 +298,7 @@ async def tax():
         user = await bot.fetch_user(userid)
         await wallet_transfer(user, "BANK", math.ceil(0.05*money), channel)
 
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("BANK",))
-    bank_money = cur.fetchone()[0]
-    economy.close()
+    bank_money = wallet_backend("BANK")
     
     await channel.send(f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!")
         
@@ -295,28 +306,12 @@ async def tax():
 async def wallet(ctx, target: discord.User = None):
     if target is None:
         target = ctx.author
-    
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-    
-    cur.execute("INSERT OR IGNORE INTO wallets (ID, cash) VALUES (?, 0)", (target.id,))
-    
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (target.id,))
-    money = cur.fetchone()[0]
-    
-    economy.close()
-    await ctx.send(f"{target.mention} has {money}$ in their wallet!")
+    money = wallet_backend(target.id)
+    await ctx.send(f"{target} has {money}$ in their wallet!")
 
 @bot.hybrid_command()
 async def used(ctx):
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-    
-    cur.execute("SELECT word FROM used_words")
-    used_word_rows = cur.fetchall()
-    used_words = [row[0] for row in used_word_rows]
-    
-    economy.close()
+    used_words = used_words_backend()
     
     words_string = ""
     for word in used_words:
@@ -326,29 +321,20 @@ async def used(ctx):
     
 @bot.hybrid_command()
 async def bank(ctx):
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-    
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("BANK",))
-    bank_money = cur.fetchone()[0]
-    
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("TOTAL",))
-    total_money = cur.fetchone()[0]
-    
-    economy.close()
+    bank_money = wallet_backend("BANK")
+    total_money = wallet_backend("TOTAL")
     await ctx.send(f"The bank currently has {bank_money}$, out of a total of {total_money}$ in the economy!")
 
 @bot.hybrid_command()
-async def send(ctx, receiver, amount):
+async def send(ctx, receiver: discord.User, amount: int):
     try:
         if int(amount) > 0:
-            rec = await bot.fetch_user(convert_mention_to_id(receiver))
-            if rec.bot:
+            if receiver.bot:
                 result = await wallet_transfer(ctx.author, "BANK", int(amount), ctx.channel)
                 await ctx.send(f"{ctx.author.mention}, you're only supposed to use this command with non-bots...  Don't worry, we know you want to be generous, so your {result}$ has been sent to the bank!")
             else:
-                result = await wallet_transfer(ctx.author, await bot.fetch_user(convert_mention_to_id(receiver)), int(amount), ctx.channel)
-                await ctx.send(f"{receiver}, {ctx.author.mention} has graciously sent you {result}$!")
+                result = await wallet_transfer(ctx.author, receiver, int(amount), ctx.channel)
+                await ctx.send(f"{receiver.mention}, {ctx.author.mention} has graciously sent you {result}$!")
         else:
             await ctx.send("Error, please enter a positive, integer amount.")
     except ValueError:
@@ -388,13 +374,7 @@ async def force_tax(ctx):
 @bot.hybrid_command()
 async def cheat(ctx):
     if dev:
-        economy = sqlite3.connect("marketmaker.db")
-        cur = economy.cursor()
-        
-        cur.execute("SELECT cash FROM wallets WHERE ID = ?", ("BANK",))
-        bank_money = cur.fetchone()[0]
-        
-        economy.close()
+        bank_money = wallet_backend("BANK")
         await wallet_transfer("BANK", ctx.author, math.ceil(0.99*bank_money), ctx.channel)
         await ctx.send("Cheat successful!")
     else:

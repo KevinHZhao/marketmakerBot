@@ -1,4 +1,4 @@
-import discord
+from __future__ import annotationsimport discord
 import os
 import sqlite3
 import random
@@ -10,7 +10,6 @@ from discord.ext import tasks, commands
 from typing import Union, Literal, List
 from dotenv import load_dotenv
 from nltk.corpus import words
-from __future__ import annotations
 
 dict = enchant.Dict("en_CA")
 

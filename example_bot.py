@@ -300,16 +300,10 @@ async def tax() -> None:
     
     await channel.send(f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!")
     
-@tasks.loop(minutes = 1)
+@tasks.loop(seconds = random.randint(60, 600))
 async def timed_puzzle() -> None:
     channel = bot.get_channel(int(os.getenv('CHANNEL')))
     await spawn_puzzle(channel)    
-    # Randomly select the delay (between 1 and 10 minutes)
-    random_delay = random.randint(1, 10)
-
-    # Restart the loop with a new interval
-    timed_puzzle.change_interval(minutes=random_delay)
-    timed_puzzle.start()  # Restart the event loop with the new interval
         
 @bot.hybrid_command()
 async def wallet(ctx, target: discord.User = None) -> None:

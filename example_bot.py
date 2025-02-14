@@ -193,7 +193,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     except asyncio.TimeoutError:
         if anarchy:
             await channel.send(f"Time's up!  No one claimed the :coin: Coins :coin: so {victim.mention}'s {coin_value}$ are going to the bank!", delete_after = 10)
-            await wallet_transfer(victim, "BANK", coin_value, message.channel)
+            await wallet_transfer(victim, "BANK", coin_value, channel)
         else:
             await channel.send("Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...", delete_after = 10)
         seeking_substr = ""
@@ -215,7 +215,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
             bonus = False
         else:
             await channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
-        await wallet_transfer("BANK", msg.author, coin_value, message.channel)
+        await wallet_transfer("BANK", msg.author, coin_value, channel)
     
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()

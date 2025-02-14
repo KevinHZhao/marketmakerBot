@@ -308,7 +308,7 @@ async def tax() -> None:
 @bot.hybrid_command()
 async def wallet(ctx, target: discord.User = None) -> None:
     """
-    Displays a selected user's wallet.  One argument is accepted, which is the user who's wallet should be displayed.  If no arguments are given, then displays the wallet of the user who used the command.
+    Displays a selected user's wallet.  Default's to command user.
     """
     if target is None:
         target = ctx.author
@@ -340,7 +340,7 @@ async def bank(ctx) -> None:
 @bot.hybrid_command()
 async def send(ctx, receiver: discord.User, amount: int) -> None:
     """
-    Sends a user an amount of money.  First argument is the user to send money to, and second argument is the amount to be sent.
+    Sends a user an amount of money.
     """
     try:
         if int(amount) > 0:

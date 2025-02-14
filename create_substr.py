@@ -1,9 +1,8 @@
 from nltk.corpus import words
-word_list = words.words()
-
-import json
 import itertools
 import string
+
+word_list = words.words()
 
 max_words = 250
 min_words = 100

@@ -1,5 +1,3 @@
-# This example requires the 'message_content' intent.
-
 import discord
 import os
 import sqlite3
@@ -7,16 +5,17 @@ import random
 import asyncio
 import math
 import datetime
+import enchant
 from discord.ext import tasks, commands
 from typing import Union, Literal, List
+from dotenv import load_dotenv
+from nltk.corpus import words
+from __future__ import annotations
 
-import enchant
 dict = enchant.Dict("en_CA")
 
-from nltk.corpus import words
 word_list = words.words()
 
-from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -62,10 +61,7 @@ async def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     
-    if receiver != "BANK":
-        recid = receiver.id
-    if receiver == "BANK":
-        recid = "BANK"
+    recid: Literal["BANK"] | int = receiver.id if receiver != "BANK" else "BANK"
         
     receiver_cash = wallet_backend(recid)
     total_cash = wallet_backend("TOTAL")
@@ -83,15 +79,8 @@ async def wallet_transfer(sender: Union[discord.User, Literal["BANK", "TOTAL"]],
     if sender == "TOTAL" or receiver == "TOTAL":
         raise Exception ("TOTAL entered for sender/receiver!")
     
-    if sender != "BANK":
-        sendid = sender.id
-    if receiver != "BANK":
-        recid = receiver.id
-    
-    if sender == "BANK":
-        sendid = "BANK"
-    if receiver == "BANK":
-        recid = "BANK"
+    recid: Literal["BANK"] | int = receiver.id if receiver != "BANK" else "BANK"
+    sendid: Literal["BANK"] | int = sender.id if sender != "BANK" else "BANK"
         
     sender_cash = wallet_backend(sendid)
     
@@ -219,6 +208,8 @@ async def on_message(message) -> None:
                 bonus = False
         
         def check(m):
+            if not m.content:
+                return False
             return not m.author.bot and dict.check(m.content.lower()) and seeking_substr in m.content.lower() and m.channel == message.channel
         
         start_time = datetime.datetime.now()
@@ -308,7 +299,7 @@ async def tax() -> None:
 @bot.hybrid_command()
 async def wallet(ctx, target: discord.User = None) -> None:
     """
-    Displays a selected user's wallet.  Default's to command user.
+    Displays a selected user's wallet.  Defaults to command user.
     """
     if target is None:
         target = ctx.author

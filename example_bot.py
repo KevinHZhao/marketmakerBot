@@ -219,16 +219,19 @@ async def on_message(message):
                 bonus = False
         
         def check(m):
-            return not m.author.bot and dict.check(m.content.lower) and seeking_substr in m.content.lower and m.channel == message.channel
+            return not m.author.bot and dict.check(str.lower(m.content)) and seeking_substr in str.lower(m.content) and m.channel == message.channel
         
-        end_time = discord.utils.utcnow() + discord.timedelta(seconds=30)
-
+        start_time = datetime.datetime.now()
+        TIME_LIMIT_SEC = 30
+        elapsed_time = 0
         try:
             # Keep listening for messages until 30 seconds have passed or a 👍 reaction is given
-            while discord.utils.utcnow() < end_time:
+            while elapsed_time < TIME_LIMIT_SEC:
                 try:
                     # Wait for a message (1 second timeout for each check)
                     msg = await bot.wait_for('message', check=check, timeout=1.0)
+                    
+                    elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
 
                     # If the message is in used_words, react with ❌ and continue checking
                     if msg.content.lower() in used_words:
@@ -237,10 +240,10 @@ async def on_message(message):
                         break  # End the game when a valid message is found
 
                 except asyncio.TimeoutError:
+                    elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
                     continue  # If no new message, continue the loop
-
-            # If 30 seconds have passed and no valid message was found, notify timeout
-            if discord.utils.utcnow() >= end_time:
+                
+            if elapsed_time >= TIME_LIMIT_SEC:
                 raise asyncio.TimeoutError()
         except asyncio.TimeoutError:
             if anarchy:
@@ -251,8 +254,8 @@ async def on_message(message):
             seeking_substr = ""
             return
         
-        await msg.add_reaction("👍")
         await announce.delete()
+        await msg.add_reaction("👍")
         if anarchy:
             if victim == msg.author:
                 await message.channel.send(f"{msg.author.mention} got it, so their money will be left alone.  `{str.lower(msg.content)}` has now been added to the list of used words.", delete_after = 10)

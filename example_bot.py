@@ -117,6 +117,113 @@ async def wallet_transfer(sender: Union[discord.User, Literal["BANK", "TOTAL"]],
     print(f"Transferred {result} from {sender} to {receiver}.")
     return result
 
+async def spawn_puzzle(channel: discord.TextChannel) -> None:
+    global victim
+    global anarchy
+    global daily_counter
+    
+    bank_money = wallet_backend("BANK")
+    total_money = wallet_backend("TOTAL")
+    used_words = used_words_backend()
+    
+    if anarchy:
+        anarchy = bank_money < total_money/5
+    else:
+        anarchy = bank_money < total_money/90
+    
+    seeking_substr = random.choice(good_substrings)
+    if anarchy:
+        economy = sqlite3.connect("marketmaker.db")
+        cur = economy.cursor()
+        
+        cur.execute("""
+        SELECT ID, cash
+        FROM wallets
+        WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 1            
+        """)
+        rows = cur.fetchall()
+        victim_row = random.choice(rows)
+        victim = await bot.fetch_user(victim_row[0])
+        victim_money = victim_row[1]
+        economy.close()
+        
+        coin_value = random.randrange(1, math.ceil(victim_money/4 + 1))
+        announce = await channel.send(f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim.mention}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+    else:
+        coin_value = random.randrange(1, math.ceil(bank_money/6 + 10))
+        if daily_counter > 0 and random.randrange(10) == 9:
+            print("BONUS TIME")
+            seeking_substr = random.choice(hard_substrings)
+            announce = await channel.send(f":dollar: Bonus Coins :dollar: have spawned,, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+            bonus = True
+            daily_counter -=1
+        else:
+            announce = await channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+            bonus = False
+    
+    def check(m):
+        if not m.content:
+            return False
+        return not m.author.bot and dict.check(m.content.lower()) and seeking_substr in m.content.lower() and m.channel == channel
+    
+    start_time = datetime.datetime.now()
+    TIME_LIMIT_SEC = 30
+    elapsed_time = 0
+    try:
+        # Keep listening for messages until 30 seconds have passed or a 👍 reaction is given
+        while elapsed_time < TIME_LIMIT_SEC:
+            try:
+                # Wait for a message (1 second timeout for each check)
+                msg = await bot.wait_for('message', check=check, timeout=1.0)
+                
+                elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
+
+                # If the message is in used_words, react with ❌ and continue checking
+                if msg.content.lower() in used_words:
+                    await msg.add_reaction("❌")
+                else:
+                    break  # End the game when a valid message is found
+
+            except asyncio.TimeoutError:
+                elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
+                continue  # If no new message, continue the loop
+            
+        if elapsed_time >= TIME_LIMIT_SEC:
+            raise asyncio.TimeoutError()
+    except asyncio.TimeoutError:
+        if anarchy:
+            await channel.send(f"Time's up!  No one claimed the :coin: Coins :coin: so {victim.mention}'s {coin_value}$ are going to the bank!", delete_after = 10)
+            await wallet_transfer(victim, "BANK", coin_value, message.channel)
+        else:
+            await channel.send("Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...", delete_after = 10)
+        seeking_substr = ""
+        return
+    
+    await announce.delete()
+    await msg.add_reaction("👍")
+    if anarchy:
+        if victim == msg.author:
+            await channel.send(f"{msg.author.mention} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
+        else:
+            await channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
+            await wallet_transfer(victim, msg.author, math.ceil(coin_value/2), channel)
+            await wallet_transfer(victim, "BANK", math.floor(coin_value/2), channel)
+    else:
+        if bonus:
+            await channel.send(f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
+            await bonus_transfer(msg.author, 100)
+            bonus = False
+        else:
+            await channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
+        await wallet_transfer("BANK", msg.author, coin_value, message.channel)
+    
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    cur.execute("INSERT INTO used_words VALUES (?)", (msg.content.lower(),))
+    economy.commit()
+    economy.close()
+    seeking_substr = ""
+
 def wallet_backend(target_id: Union[int, Literal["BANK", "TOTAL"]]) -> int:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -149,6 +256,9 @@ def used_words_backend() -> List[str]:
 async def on_ready() -> None:
     print(f'We have logged in as {bot.user}')
     print(bot.guilds)
+    timed = bool(int(os.getenv('TIMED_SPAWN')))
+    if timed:
+        timed_puzzle.start()
     tax.start()
     await bot.tree.sync()
 
@@ -160,115 +270,9 @@ async def on_message(message) -> None:
     await bot.process_commands(message)
 
     global seeking_substr
-    global victim
-    global anarchy
-    global daily_counter
     
     if random.randrange(100) < prob_coin and not seeking_substr and message.guild:
-        
-        bank_money = wallet_backend("BANK")
-        
-        total_money = wallet_backend("TOTAL")
-        
-        used_words = used_words_backend()
-        
-        if anarchy:
-            anarchy = bank_money < total_money/5
-        else:
-            anarchy = bank_money < total_money/90
-        
-        seeking_substr = random.choice(good_substrings)
-        if anarchy:
-            economy = sqlite3.connect("marketmaker.db")
-            cur = economy.cursor()
-            
-            cur.execute("""
-            SELECT ID, cash
-            FROM wallets
-            WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 1            
-            """)
-            rows = cur.fetchall()
-            victim_row = random.choice(rows)
-            victim = await bot.fetch_user(victim_row[0])
-            victim_money = victim_row[1]
-            economy.close()
-            
-            coin_value = random.randrange(1, math.ceil(victim_money/4 + 1))
-            announce = await message.channel.send(f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim.mention}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
-        else:
-            coin_value = random.randrange(1, math.ceil(bank_money/6 + 10))
-            if daily_counter > 0 and random.randrange(10) == 9:
-                print("BONUS TIME")
-                seeking_substr = random.choice(hard_substrings)
-                announce = await message.channel.send(f":dollar: Bonus Coins :dollar: have spawned,, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
-                bonus = True
-                daily_counter -=1
-            else:
-                announce = await message.channel.send(f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
-                bonus = False
-        
-        def check(m):
-            if not m.content:
-                return False
-            return not m.author.bot and dict.check(m.content.lower()) and seeking_substr in m.content.lower() and m.channel == message.channel
-        
-        start_time = datetime.datetime.now()
-        TIME_LIMIT_SEC = 30
-        elapsed_time = 0
-        try:
-            # Keep listening for messages until 30 seconds have passed or a 👍 reaction is given
-            while elapsed_time < TIME_LIMIT_SEC:
-                try:
-                    # Wait for a message (1 second timeout for each check)
-                    msg = await bot.wait_for('message', check=check, timeout=1.0)
-                    
-                    elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
-
-                    # If the message is in used_words, react with ❌ and continue checking
-                    if msg.content.lower() in used_words:
-                        await msg.add_reaction("❌")
-                    else:
-                        break  # End the game when a valid message is found
-
-                except asyncio.TimeoutError:
-                    elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
-                    continue  # If no new message, continue the loop
-                
-            if elapsed_time >= TIME_LIMIT_SEC:
-                raise asyncio.TimeoutError()
-        except asyncio.TimeoutError:
-            if anarchy:
-                await message.channel.send(f"Time's up!  No one claimed the :coin: Coins :coin: so {victim.mention}'s {coin_value}$ are going to the bank!", delete_after = 10)
-                await wallet_transfer(victim, "BANK", coin_value, message.channel)
-            else:
-                await message.channel.send("Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...", delete_after = 10)
-            seeking_substr = ""
-            return
-        
-        await announce.delete()
-        await msg.add_reaction("👍")
-        if anarchy:
-            if victim == msg.author:
-                await message.channel.send(f"{msg.author.mention} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
-            else:
-                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
-                await wallet_transfer(victim, msg.author, math.ceil(coin_value/2), message.channel)
-                await wallet_transfer(victim, "BANK", math.floor(coin_value/2), message.channel)
-        else:
-            if bonus:
-                await message.channel.send(f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
-                await bonus_transfer(msg.author, 100)
-                bonus = False
-            else:
-                await message.channel.send(f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.", delete_after = 10)
-            await wallet_transfer("BANK", msg.author, coin_value, message.channel)
-        
-        economy = sqlite3.connect("marketmaker.db")
-        cur = economy.cursor()
-        cur.execute("INSERT INTO used_words VALUES (?)", (msg.content.lower(),))
-        economy.commit()
-        economy.close()
-        seeking_substr = ""
+        await spawn_puzzle()
         
 @tasks.loop(time=time)
 async def tax() -> None:
@@ -295,6 +299,17 @@ async def tax() -> None:
     bank_money = wallet_backend("BANK")
     
     await channel.send(f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!")
+    
+@tasks.loop(minutes = 1)
+async def timed_puzzle() -> None:
+    channel = bot.get_channel(int(os.getenv('CHANNEL')))
+    await spawn_puzzle(channel)    
+    # Randomly select the delay (between 1 and 10 minutes)
+    random_delay = random.randint(1, 10)
+
+    # Restart the loop with a new interval
+    timed_puzzle.change_interval(minutes=random_delay)
+    timed_puzzle.start()  # Restart the event loop with the new interval
         
 @bot.hybrid_command()
 async def wallet(ctx, target: discord.User = None) -> None:

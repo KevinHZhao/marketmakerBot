@@ -272,7 +272,7 @@ async def on_message(message) -> None:
     global seeking_substr
     
     if random.randrange(100) < prob_coin and not seeking_substr and message.guild:
-        await spawn_puzzle()
+        await spawn_puzzle(message.channel)
         
 @tasks.loop(time=time)
 async def tax() -> None:

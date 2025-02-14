@@ -1,4 +1,5 @@
-from __future__ import annotationsimport discord
+from __future__ import annotations
+import discord
 import os
 import sqlite3
 import random

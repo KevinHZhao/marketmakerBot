@@ -77,7 +77,7 @@ async def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount:
     economy.close()
     print(f"Gave {amount} to {receiver} as a bonus.")
 
-async def wallet_transfer(sender: Union[discord.User, Literal["BANK", "TOTAL"]], receiver: Union[discord.User, Literal["BANK", "TOTAL"]], amount: int, channel: discord.Channel) -> int:
+async def wallet_transfer(sender: Union[discord.User, Literal["BANK", "TOTAL"]], receiver: Union[discord.User, Literal["BANK", "TOTAL"]], amount: int, channel: discord.TextChannel) -> int:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     if sender == "TOTAL" or receiver == "TOTAL":

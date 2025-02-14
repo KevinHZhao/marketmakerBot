@@ -117,7 +117,7 @@ async def wallet_transfer(sender: Union[discord.User, Literal["BANK", "TOTAL"]],
     else:
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (sender_cash - amount, sendid))
         
-        economy.id()
+        economy.commit()
         receiver_cash = wallet_backend(recid)
         
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid))

@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import numpy as np
 from functools import partial
 from itertools import product
 from multiprocessing import Pool
@@ -38,6 +39,32 @@ def num_member_words(substr: str, word_list: list[str]) -> int:
     return sum(substr in word for word in word_list)
 
 
+def create_substr(substr_counts: list[int], substrings: list[str], fpath: Path, difficulty: str, min_words: int = 0, max_words: float = float("inf")) -> None:
+    if not fpath.is_file():
+        print(f"Creating list of {difficulty} difficulty substrings...")
+        good_substrings = [
+            substrings[i]
+            for i in range(len(substrings))
+            if min_words <= substr_counts[i] < max_words
+        ]
+
+        with fpath.open("w") as f:
+            for s in good_substrings:
+                f.write(s + "\n")
+
+
+def generate_counts(substrings: list[str], fpath: Path) -> None:
+    # Determine counts of words containing each substring
+    print("Creating substring counts...")
+    with Pool() as pool:
+        substr_counts = pool.map(
+            partial(num_member_words, word_list=words.words()),
+            substrings,
+            chunksize=50,
+        )
+    np.savetxt(fpath, substr_counts)
+
+
 def ensure_substr() -> None:
     """Ensures that substring lists are initialized."""
     load_dotenv()
@@ -48,6 +75,7 @@ def ensure_substr() -> None:
     hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
 
     # Check if we need to create the lists
+    count_fpath = static_dir / f"counts_substr.txt"
     normal_fpath = static_dir / f"substr_normal_{normal_min_words}.txt"
     hard_fpath = static_dir / f"substr_hard_{hard_min_words}.txt"
     require_create = not normal_fpath.is_file() or not hard_fpath.is_file()
@@ -55,40 +83,14 @@ def ensure_substr() -> None:
     if not require_create:
         print("Substring lists are up to date.")
         return
-
-    print("Creating substring lists, this can take several minutes...")
+    
     substrings = ["".join(i) for i in product(ascii_lowercase, repeat=2)] + [
         "".join(i) for i in product(ascii_lowercase, repeat=3)
     ]
+    if not count_fpath.is_file():
+        generate_counts(substrings, count_fpath)
+        
+    substr_counts = np.loadtxt(count_fpath)
 
-    # Determine counts of words containing each substring
-    with Pool() as pool:
-        substr_counts = pool.map(
-            partial(num_member_words, word_list=words.words()),
-            substrings,
-            chunksize=50,
-        )
-
-    if not normal_fpath.is_file():
-        print("Creating list of normal difficulty substrings...")
-        normal_substrings = [
-            substrings[i]
-            for i in range(len(substrings))
-            if substr_counts[i] >= normal_min_words
-        ]
-
-        with normal_fpath.open("w") as f:
-            for s in normal_substrings:
-                f.write(s + "\n")
-
-    if not hard_fpath.is_file():
-        print("Creating list of hard difficulty substrings...")
-        hard_substrings = [
-            substrings[i]
-            for i in range(len(substrings))
-            if substr_counts[i] >= hard_min_words
-        ]
-
-        with hard_fpath.open("w") as f:
-            for s in hard_substrings:
-                f.write(s + "\n")
+    create_substr(substr_counts, substrings, normal_fpath, "medium", normal_min_words)
+    create_substr(substr_counts, substrings, hard_fpath, "hard", hard_min_words, normal_min_words)

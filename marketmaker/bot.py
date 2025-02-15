@@ -173,7 +173,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
             print("BONUS TIME")
 
             hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
-            with open(f"{root}/static/substr_normal_{hard_min_words}.txt", "r") as f:
+            with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "r") as f:
                 hard_substrings = [line.rstrip("\n") for line in f]
 
             seeking_substr = random.choice(hard_substrings)

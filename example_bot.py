@@ -232,8 +232,7 @@ def wallet_backend(target_id: Union[int, Literal["BANK", "TOTAL"]]) -> int:
     if cur.fetchone() is None:
         print(f"{target_id} wallet created!")
         cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (target_id,))
-    
-    cur.execute("INSERT OR IGNORE INTO wallets (ID, cash) VALUES (?, 0)", (target_id,))
+        economy.commit()
     
     cur.execute("SELECT cash FROM wallets WHERE ID = ?", (target_id,))
     money = cur.fetchone()[0]

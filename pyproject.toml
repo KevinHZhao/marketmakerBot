@@ -10,6 +10,7 @@ dependencies = [
     "python-dotenv", # token
     "discord.py",    # discord bot
     "nltk",          # word generation
+    "pyenchant",     # spell checking
 ]
 requires-python = ">=3.11"
 readme = "README.md"

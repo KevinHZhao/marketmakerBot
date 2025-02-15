@@ -155,7 +155,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         if daily_counter > 0 and random.randrange(10) == 9:
             print("BONUS TIME")
             seeking_substr = random.choice(hard_substrings)
-            announce = await channel.send(f":dollar: Bonus Coins :dollar: have spawned,, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
+            announce = await channel.send(f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!", delete_after = 30)
             bonus = True
             daily_counter -=1
         else:

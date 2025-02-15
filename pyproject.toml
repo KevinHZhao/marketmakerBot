@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "marketmaker"
+version = "0.1.0"
+dependencies = [
+    "python-dotenv", # token
+    "discord.py",    # discord bot
+    "nltk",          # word generation
+]
+requires-python = ">=3.11"
+readme = "README.md"
+
+[project.scripts]
+bot = "marketmaker.bot:main"
+
+[tool.setuptools]
+packages = ["marketmaker"]

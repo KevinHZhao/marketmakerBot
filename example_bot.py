@@ -121,6 +121,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     global victim
     global anarchy
     global daily_counter
+    global seeking_substr
     
     bank_money = wallet_backend("BANK")
     total_money = wallet_backend("TOTAL")

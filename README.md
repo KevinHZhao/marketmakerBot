@@ -16,9 +16,14 @@ The `-e` denotes an EDITABLE install, meaning you can change the code and run th
 Create a file called `.env` with the following format:
 
 ```plaintext
-BOT_TOKEN=...
-PROB=...
-DEV_MODE=...
+BOT_TOKEN=... # discord bot token
+PROB=... # percentage probability of puzzle spawning on msg
+DEV_MODE=... # 1 for dev, 0 for prod
+TIMED_SPAWN=... # 1 for having puzzles spawn on a 1 to 10 min timer, 0 for no timed puzzles
+CHANNEL=... # discord channel id of the channel bot should default announcements to (ex taxation announcements)
+NORMAL_MIN_WORDS=... # minimum number of words you'd like to be possible for each substring in a normal puzzle
+HARD_MIN_WORDS=... # minimum number of words you'd like to be possible for each substring in a hard puzzle
+AUTHOR=... # discord user id of the bot's author (may not be necessary)
 ```
 
 ## Running the Bot

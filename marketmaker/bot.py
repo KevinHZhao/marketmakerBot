@@ -12,11 +12,8 @@ import discord
 import enchant
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-from nltk.corpus import words
 
 dict = enchant.Dict("en_CA")
-
-word_list = words.words()
 
 load_dotenv()
 
@@ -43,11 +40,13 @@ if not os.path.exists("marketmaker.db"):
     economy.commit()
     economy.close()
 
-with open("substr_250.txt", "r") as f:
-    good_substrings = [line.rstrip("\n") for line in f]
-
-with open("substr_100.txt", "r") as f:
+normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
+hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
+with open(f"substr_normal_{normal_min_words}.txt", "r") as f:
+    normal_substrings = [line.rstrip("\n") for line in f]
+with open(f"substr_normal_{hard_min_words}.txt", "r") as f:
     hard_substrings = [line.rstrip("\n") for line in f]
+    
 seeking_substr = ""
 victim = ""
 anarchy = False
@@ -159,7 +158,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     else:
         anarchy = bank_money < total_money / 90
 
-    seeking_substr = random.choice(good_substrings)
+    seeking_substr = random.choice(normal_substrings)
     if anarchy:
         economy = sqlite3.connect("marketmaker.db")
         cur = economy.cursor()

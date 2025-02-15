@@ -7,6 +7,7 @@ import os
 import random
 import sqlite3
 from typing import List, Literal, Union
+from pathlib import Path
 
 import discord
 import enchant
@@ -39,13 +40,6 @@ if not os.path.exists("marketmaker.db"):
     )
     economy.commit()
     economy.close()
-
-normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
-hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
-with open(f"substr_normal_{normal_min_words}.txt", "r") as f:
-    normal_substrings = [line.rstrip("\n") for line in f]
-with open(f"substr_normal_{hard_min_words}.txt", "r") as f:
-    hard_substrings = [line.rstrip("\n") for line in f]
     
 seeking_substr = ""
 victim = ""
@@ -157,6 +151,12 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         anarchy = bank_money < total_money / 5
     else:
         anarchy = bank_money < total_money / 90
+        
+    root = Path(__file__).parents[1]
+
+    normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
+    with open(f"{root}/static/substr_normal_{normal_min_words}.txt", "r") as f:
+        normal_substrings = [line.rstrip("\n") for line in f]
 
     seeking_substr = random.choice(normal_substrings)
     if anarchy:
@@ -183,6 +183,11 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
         if daily_counter > 0 and random.randrange(10) == 9:
             print("BONUS TIME")
+            
+            hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
+            with open(f"{root}/static/substr_normal_{hard_min_words}.txt", "r") as f:
+                hard_substrings = [line.rstrip("\n") for line in f]
+                
             seeking_substr = random.choice(hard_substrings)
             announce = await channel.send(
                 f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!",

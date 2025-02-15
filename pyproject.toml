@@ -19,4 +19,4 @@ readme = "README.md"
 bot = "marketmaker.start:main"
 
 [tool.setuptools]
-packages = ["marketmaker"]
+packages = ["marketmaker", "scripts"]

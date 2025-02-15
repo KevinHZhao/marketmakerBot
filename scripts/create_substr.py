@@ -36,6 +36,6 @@ def main() -> None:
             if hard_min_words <= sum(i in s for s in word_list) < normal_min_words:
                 hard_substrings.append(i)
 
-        with open(f"{root}/static/substr_hard_{normal_min_words}.txt", "w") as f:
+        with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "w") as f:
             for s in hard_substrings:
                 f.write(s + '\n')

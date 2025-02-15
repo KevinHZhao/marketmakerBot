@@ -6,48 +6,38 @@ import math
 import os
 import random
 import sqlite3
-from typing import List, Literal, Union
 from pathlib import Path
+from typing import Literal, Union
 
 import discord
 import enchant
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
+from marketmaker.backend import used_words_backend, wallet_backend
+from marketmaker.initialization import ensure_db, ensure_substr
+
 dict = enchant.Dict("en_CA")
 
 load_dotenv()
 
+# Setup
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 prob_coin = int(os.getenv("PROB"))
 dev = bool(int(os.getenv("DEV_MODE")))
 
-starting_money = 100000
-# Initialize the economy if it does not exist
-if not os.path.exists("marketmaker.db"):
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-    cur.execute("CREATE TABLE wallets(ID TEXT, cash INTEGER DEFAULT 0)")
-    cur.execute("CREATE TABLE used_words(word TEXT)")
-    cur.execute(
-        """
-        INSERT INTO wallets VALUES
-            ('TOTAL', ?),
-            ('BANK', ?)
-    """,
-        (starting_money, starting_money),
-    )
-    economy.commit()
-    economy.close()
-    
+# Game data init
+ensure_substr()
+ensure_db()
+
+# Constants
 seeking_substr = ""
 victim = ""
 anarchy = False
 daily_counter = 3
 
-utc = datetime.timezone.utc
-time = datetime.time(hour=5, minute=0, tzinfo=utc)
+time = datetime.time(hour=5, minute=0, tzinfo=datetime.UTC)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -55,9 +45,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="##", intents=intents)
 
 
-async def bonus_transfer(
-    receiver: Union[discord.User, Literal["BANK"]], amount: int
-) -> None:
+def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) -> None:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
@@ -151,7 +139,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         anarchy = bank_money < total_money / 5
     else:
         anarchy = bank_money < total_money / 90
-        
+
     root = Path(__file__).parents[1]
 
     normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
@@ -183,11 +171,11 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
         if daily_counter > 0 and random.randrange(10) == 9:
             print("BONUS TIME")
-            
+
             hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
             with open(f"{root}/static/substr_normal_{hard_min_words}.txt", "r") as f:
                 hard_substrings = [line.rstrip("\n") for line in f]
-                
+
             seeking_substr = random.choice(hard_substrings)
             announce = await channel.send(
                 f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + 100}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!",
@@ -274,7 +262,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
                 f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
-            await bonus_transfer(msg.author, 100)
+            bonus_transfer(msg.author, 100)
             bonus = False
         else:
             await channel.send(
@@ -289,35 +277,6 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     economy.commit()
     economy.close()
     seeking_substr = ""
-
-
-def wallet_backend(target_id: Union[int, Literal["BANK", "TOTAL"]]) -> int:
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-
-    cur.execute("SELECT 1 FROM wallets WHERE ID = ?", (target_id,))
-    if cur.fetchone() is None:
-        print(f"{target_id} wallet created!")
-        cur.execute("INSERT INTO wallets (ID, cash) VALUES (?, 0)", (target_id,))
-        economy.commit()
-
-    cur.execute("SELECT cash FROM wallets WHERE ID = ?", (target_id,))
-    money = cur.fetchone()[0]
-
-    economy.close()
-    return money
-
-
-def used_words_backend() -> List[str]:
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-
-    cur.execute("SELECT word FROM used_words")
-    used_word_rows = cur.fetchall()
-    used_words = [row[0] for row in used_word_rows]
-
-    economy.close()
-    return used_words
 
 
 @bot.event
@@ -500,10 +459,10 @@ async def cheat(ctx) -> None:
 
 
 # Make the bot runnable from CLI (main must be a function)
-def main() -> None:
+def run_bot() -> None:
     bot.run(BOT_TOKEN)
 
 
 if __name__ == "__main__":
     # this allows you to run the bot from this script too
-    main()
+    run_bot()

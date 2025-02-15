@@ -16,7 +16,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 
 [project.scripts]
-bot = "marketmaker.start:main"
+bot = "marketmaker.bot:run_bot"
 
 [tool.setuptools]
 packages = ["marketmaker", "scripts"]

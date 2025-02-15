@@ -1,8 +1,10 @@
 import os
 import sqlite3
-import string
+from functools import partial
 from itertools import product
+from multiprocessing import Pool
 from pathlib import Path
+from string import ascii_lowercase
 
 from dotenv import load_dotenv
 from nltk.corpus import words
@@ -31,10 +33,13 @@ def ensure_db() -> None:
         economy.close()
 
 
+def num_member_words(substr: str, word_list: list[str]) -> int:
+    """Returns the number of words in the nltk corpus that contain the given substring."""
+    return sum(substr in word for word in word_list)
+
+
 def ensure_substr() -> None:
     """Ensures that substring lists are initialized."""
-    word_list = words.words()
-
     load_dotenv()
 
     static_dir = Path(__file__).parents[1] / "static"
@@ -42,33 +47,48 @@ def ensure_substr() -> None:
     normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
     hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
 
-    letters = list(string.ascii_lowercase)
-    substrings = ["".join(i) for i in product(letters, repeat=2)] + [
-        "".join(i) for i in product(letters, repeat=3)
+    # Check if we need to create the lists
+    normal_fpath = static_dir / f"substr_normal_{normal_min_words}.txt"
+    hard_fpath = static_dir / f"substr_hard_{hard_min_words}.txt"
+    require_create = not normal_fpath.is_file() or not hard_fpath.is_file()
+
+    if not require_create:
+        print("Substring lists are up to date.")
+        return
+
+    print("Creating substring lists, this can take several minutes...")
+    substrings = ["".join(i) for i in product(ascii_lowercase, repeat=2)] + [
+        "".join(i) for i in product(ascii_lowercase, repeat=3)
     ]
 
-    if not (fpath := static_dir / f"substr_normal_{normal_min_words}.txt").is_file():
-        print(
-            "Creating list of normal difficulty substrings, this can take several minutes..."
+    # Determine counts of words containing each substring
+    with Pool() as pool:
+        substr_counts = pool.map(
+            partial(num_member_words, word_list=words.words()),
+            substrings,
+            chunksize=50,
         )
-        normal_substrings = []
-        for i in substrings:
-            if normal_min_words <= sum(i in s for s in word_list):
-                normal_substrings.append(i)
 
-        with fpath.open("w") as f:
+    if not normal_fpath.is_file():
+        print("Creating list of normal difficulty substrings...")
+        normal_substrings = [
+            substrings[i]
+            for i in range(len(substrings))
+            if substr_counts[i] >= normal_min_words
+        ]
+
+        with normal_fpath.open("w") as f:
             for s in normal_substrings:
                 f.write(s + "\n")
 
-    if not (fpath := static_dir / f"substr_hard_{hard_min_words}.txt").is_file():
-        print(
-            "Creating list of hard difficulty substrings, this can take several minutes..."
-        )
-        hard_substrings = []
-        for i in substrings:
-            if hard_min_words <= sum(i in s for s in word_list) < normal_min_words:
-                hard_substrings.append(i)
+    if not hard_fpath.is_file():
+        print("Creating list of hard difficulty substrings...")
+        hard_substrings = [
+            substrings[i]
+            for i in range(len(substrings))
+            if substr_counts[i] >= hard_min_words
+        ]
 
-        with fpath.open("w") as f:
+        with hard_fpath.open("w") as f:
             for s in hard_substrings:
                 f.write(s + "\n")

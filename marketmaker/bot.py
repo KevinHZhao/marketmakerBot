@@ -7,7 +7,7 @@ import os
 import random
 import sqlite3
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Union, Optional
 
 import discord
 import enchant
@@ -23,10 +23,15 @@ dict = enchant.Dict("en_CA")
 load_dotenv()
 
 # Setup
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+prob_coin_env = os.getenv("PROB")
+if prob_coin_env is None:
+    raise Exception("No PROB provided in .env file.")
+prob_coin = int(prob_coin_env)
 
-prob_coin = int(os.getenv("PROB"))
-dev = bool(int(os.getenv("DEV_MODE")))
+dev_mode_env = os.getenv("DEV_MODE")
+if dev_mode_env is None:
+    raise Exception("No DEV_MODE provided in .env file.")
+dev = bool(int(dev_mode_env))
 
 # Game data init
 ensure_substr()
@@ -44,7 +49,7 @@ def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) 
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
-    recid: Literal["BANK"] | int = receiver.id if receiver != "BANK" else "BANK"
+    recid: Literal["BANK"] | int = receiver.id if isinstance(receiver, discord.User) else "BANK"
 
     receiver_cash = wallet_backend(recid)
     total_cash = wallet_backend("TOTAL")
@@ -134,7 +139,6 @@ async def wallet_transfer(
 
 
 async def spawn_puzzle(channel: discord.TextChannel) -> None:
-    victim = bot.game_vars.victim
     daily_counter = bot.game_vars.daily_counter
 
     bank_money = wallet_backend("BANK")
@@ -147,8 +151,12 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         bot.game_vars.anarchy = bank_money < total_money / 90
 
     root = Path(__file__).parents[1]
+    
+    normal_min_env = os.getenv("NORMAL_MIN_WORDS")
+    if normal_min_env is None:
+        raise Exception("No NORMAL_MIN_WORDS provided in .env file.")
+    normal_min_words = int(normal_min_env)
 
-    normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
     with open(f"{root}/static/substr_normal_{normal_min_words}.txt", "r") as f:
         normal_substrings = [line.rstrip("\n") for line in f]
 
@@ -170,7 +178,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
 
         coin_value = random.randrange(1, math.ceil(victim_money / 4 + 1))
         announce = await channel.send(
-            f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
+            f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {bot.game_vars.victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
             delete_after=30,
         )
     else:
@@ -178,11 +186,11 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         if daily_counter > 0 and random.randrange(10) == 9:
             print("BONUS TIME")
             
-            hard_min_words_pre = os.getenv("HARD_MIN_WORDS")
-            if hard_min_words_pre is None:
+            hard_min_words_env = os.getenv("HARD_MIN_WORDS")
+            if hard_min_words_env is None:
                 raise Exception("No HARD_MIN_WORDS provided in .env file.")
-
-            hard_min_words = int(hard_min_words_pre)
+            hard_min_words = int(hard_min_words_env)
+            
             with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "r") as f:
                 hard_substrings = [line.rstrip("\n") for line in f]
 
@@ -237,10 +245,11 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     except asyncio.TimeoutError:
         if bot.game_vars.anarchy:
             await channel.send(
-                f"Time's up!  No one claimed the :coin: Coins :coin: so {victim}'s {coin_value}$ are going to the bank!",
+                f"Time's up!  No one claimed the :coin: Coins :coin: so {bot.game_vars.victim}'s {coin_value}$ are going to the bank!",
                 delete_after=10,
             )
-            await wallet_transfer(victim, "BANK", coin_value, channel, 3)
+            assert bot.game_vars.victim is not None
+            await wallet_transfer(bot.game_vars.victim, "BANK", coin_value, channel, 3)
         else:
             await channel.send(
                 "Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...",
@@ -252,20 +261,22 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     await announce.delete()
     await msg.add_reaction("👍")
     if bot.game_vars.anarchy:
-        if victim == msg.author:
+        if bot.game_vars.victim == msg.author:
             await channel.send(
                 f"{msg.author} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
         else:
             await channel.send(
-                f"{msg.author} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it, and {coin_value}$ has been split between the bank and their wallet, out of {bot.game_vars.victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
+            
+            assert bot.game_vars.victim is not None
             await wallet_transfer(
-                victim, msg.author, math.ceil(coin_value / 2), channel, 3
+                bot.game_vars.victim, msg.author, math.ceil(coin_value / 2), channel, 3
             )
-            await wallet_transfer(victim, "BANK", math.floor(coin_value / 2), channel, 3)
+            await wallet_transfer(bot.game_vars.victim, "BANK", math.floor(coin_value / 2), channel, 3)
     else:
         if bonus:
             await channel.send(
@@ -293,7 +304,12 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
 async def on_ready() -> None:
     print(f"We have logged in as {bot.user}")
     print(bot.guilds)
-    timed = bool(int(os.getenv("TIMED_SPAWN")))
+    
+    time_env = os.getenv("TIMED_SPAWN")
+    if time_env is None:
+        raise Exception("No TIMED_SPAWN provided in .env file.")
+    timed = bool(int(time_env))
+    
     if timed:
         timed_puzzle.start()
     tax.start()
@@ -316,8 +332,14 @@ async def tax() -> None:
     print("Taxation time!")
 
     bot.game_vars.daily_counter = 3
-
-    channel = bot.get_channel(int(os.getenv("CHANNEL")))
+    
+    channel_env = os.getenv("CHANNEL")
+    if channel_env is None:
+        raise Exception("No CHANNEL provided in .env file.")
+    channel = await bot.fetch_channel(int(channel_env))
+        
+    if not isinstance(channel, discord.TextChannel):
+        raise Exception("Provided CHANNEL points to a non-text channel.")
 
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -342,12 +364,19 @@ async def tax() -> None:
 @tasks.loop(seconds=random.randint(60, 600))
 async def timed_puzzle() -> None:
     if not bot.game_vars.seeking_substr:
-        channel = bot.get_channel(int(os.getenv("CHANNEL")))
+        channel_env = os.getenv("CHANNEL")
+        if channel_env is None:
+            raise Exception("No CHANNEL provided in .env file.")
+        channel = await bot.fetch_channel(int(channel_env))
+        
+        if not isinstance(channel, discord.TextChannel):
+            raise Exception("Provided CHANNEL points to a non-text channel.")
+        
         await spawn_puzzle(channel)
 
 
 @bot.hybrid_command()
-async def wallet(ctx, target: discord.User = None) -> None:
+async def wallet(ctx, target: Optional[discord.User] = None) -> None:
     """
     Displays a selected user's wallet.  Defaults to command user.
     """
@@ -438,15 +467,15 @@ async def leaderboard(ctx) -> None:
     
 
 @bot.hybrid_command()
-async def ledger(ctx, target: discord.User = None) -> None:
+async def ledger(ctx, target: Optional[discord.User] = None) -> None:
     """
     Displays a ledger of the ten most recent transactions from an individual
     """
-    if target is None:
+    if isinstance(target, discord.User):
+        targetid: Union[Literal["BANK"], int] = target.id
+    else:
         targetid = "BANK"
         await ctx.send("No user given, showing ten most recent transactions...", delete_after = 10)
-    else:
-        targetid = target.id
     
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -480,13 +509,13 @@ async def ledger(ctx, target: discord.User = None) -> None:
         
         sendid = row[1]
         if sendid == "BANK":
-            sender = "the bank"
+            sender: Union[Literal["the bank"], discord.User] = "the bank"
         else:
             sender = await bot.fetch_user(int(sendid))
             
         recid = row[2]
         if recid == "BANK":
-            receiver = "The bank"
+            receiver: Union[Literal["The bank"], discord.User] = "The bank"
         else:
             receiver = await bot.fetch_user(int(recid))
             
@@ -534,6 +563,9 @@ async def cheat(ctx) -> None:
 
 # Make the bot runnable from CLI (main must be a function)
 def run_bot() -> None:
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    if BOT_TOKEN is None:
+        raise Exception("No BOT_TOKEN provided in .env file.")
     bot.run(BOT_TOKEN)
 
 

@@ -72,11 +72,18 @@ def ensure_substr() -> None:
 
     static_dir = Path(__file__).parents[1] / "static"
 
-    normal_min_words = int(os.getenv("NORMAL_MIN_WORDS"))
-    hard_min_words = int(os.getenv("HARD_MIN_WORDS"))
+    normal_min_env = os.getenv("NORMAL_MIN_WORDS")
+    if normal_min_env is None:
+        raise Exception("No NORMAL_MIN_WORDS provided in .env file.")
+    normal_min_words = int(normal_min_env)
+    
+    hard_min_words_env = os.getenv("HARD_MIN_WORDS")
+    if hard_min_words_env is None:
+        raise Exception("No HARD_MIN_WORDS provided in .env file.")
+    hard_min_words = int(hard_min_words_env)
 
     # Check if we need to create the lists
-    count_fpath = static_dir / f"counts_substr.txt"
+    count_fpath = static_dir / "counts_substr.txt"
     normal_fpath = static_dir / f"substr_normal_{normal_min_words}.txt"
     hard_fpath = static_dir / f"substr_hard_{hard_min_words}.txt"
     require_create = not normal_fpath.is_file() or not hard_fpath.is_file()

@@ -2,12 +2,13 @@ from dataclasses import dataclass
 
 import discord
 from discord.ext import commands
+from typing import Optional
 
 
 @dataclass
 class GameVars:
     seeking_substr: str = ""
-    victim: discord.User = None
+    victim: Optional[discord.User] = None
     anarchy: bool = False
     daily_counter: int = 3
     

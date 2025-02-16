@@ -49,7 +49,12 @@ def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) 
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
-    recid: Literal["BANK"] | int = receiver.id if isinstance(receiver, discord.User) else "BANK"
+    if isinstance(receiver, (discord.User, discord.Member)):
+        recid: Union[Literal["BANK"], int] = receiver.id
+    elif receiver != "BANK":
+        raise Exception("receiver is neither discord.User nor BANK!")
+    else:
+        recid = "BANK"
 
     receiver_cash = wallet_backend(recid)
     total_cash = wallet_backend("TOTAL")
@@ -83,19 +88,34 @@ async def wallet_transfer(
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
-    recid: Literal["BANK"] | int = receiver.id if isinstance(receiver, discord.User) else "BANK"
-    sendid: Literal["BANK"] | int = sender.id if isinstance(sender, discord.User) else "BANK"
+    if isinstance(receiver, (discord.User, discord.Member)):
+        recid: Union[Literal["BANK"], int] = receiver.id
+    elif receiver != "BANK":
+        raise Exception("receiver is neither discord.User nor BANK")
+    else:
+        recid = "BANK"
+        
+    if isinstance(sender, (discord.User, discord.Member)):
+        sendid: Union[Literal["BANK"], int] = sender.id
+    elif sender != "BANK":
+        raise Exception("sender is neither discord.User nor BANK")
+    else:
+        sendid = "BANK"
 
     sender_cash = wallet_backend(sendid)
 
     if sender_cash < amount:
-        if isinstance(sender, discord.User):
+        if isinstance(sender, (discord.User, discord.Member)):
             sendmen = sender.mention
+        elif sender != "BANK":
+            raise Exception("sender is neither discord.User nor BANK")
         else:
             sendmen = "The bank"
 
-        if isinstance(receiver, discord.User):
+        if isinstance(receiver, (discord.User, discord.Member)):
             recmen = receiver.mention
+        elif receiver != "BANK":
+            raise Exception("receiver is neither discord.User nor BANK")
         else:
             recmen = "the bank"
 
@@ -467,12 +487,14 @@ async def leaderboard(ctx) -> None:
     
 
 @bot.hybrid_command()
-async def ledger(ctx, target: Optional[discord.User] = None) -> None:
+async def ledger(ctx, target: Optional[discord.User]) -> None:
     """
     Displays a ledger of the ten most recent transactions from an individual
     """
-    if isinstance(target, discord.User):
+    if isinstance(target, (discord.User, discord.Member)):
         targetid: Union[Literal["BANK"], int] = target.id
+    elif target is not None:
+        raise Exception("target is neither discord.User nor None!")
     else:
         targetid = "BANK"
         await ctx.send("No user given, showing ten most recent transactions...", delete_after = 10)
@@ -509,7 +531,9 @@ async def ledger(ctx, target: Optional[discord.User] = None) -> None:
         
         sendid = row[1]
         if sendid == "BANK":
-            sender: Union[Literal["the bank"], discord.User] = "the bank"
+            sender: Union[Literal["the bank"], discord.User, None] = "the bank"
+        elif sendid == "N/A":
+            sender = None
         else:
             sender = await bot.fetch_user(int(sendid))
             

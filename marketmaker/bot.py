@@ -13,6 +13,7 @@ import discord
 import enchant
 from discord.ext import tasks
 from dotenv import load_dotenv
+from pytz import timezone
 
 from marketmaker.backend import used_words_backend, wallet_backend
 from marketmaker.initialization import ensure_db, ensure_substr
@@ -66,7 +67,7 @@ def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) 
         "UPDATE wallets SET cash = ? WHERE ID = ?", (total_cash + amount, "TOTAL")
     )
     
-    timestamp = datetime.datetime.now()
+    timestamp = datetime.datetime.now(timezone("US/Eastern"))
     
     cur.execute(
         "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, 'N/A', ?, ?, 1)",
@@ -145,7 +146,7 @@ async def wallet_transfer(
         )
         result = amount
     
-    timestamp = datetime.datetime.now()
+    timestamp = datetime.datetime.now(timezone("US/Eastern"))
     
     cur.execute(
         "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, ?, ?, ?, ?)",

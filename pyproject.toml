@@ -12,6 +12,7 @@ dependencies = [
     "nltk",          # word generation
     "pyenchant",     # spell checking
     "numpy",         # saving int lists
+    "pytz",          # timezone
 ]
 requires-python = ">=3.11"
 readme = "README.md"

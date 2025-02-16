@@ -60,6 +60,13 @@ def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) 
     cur.execute(
         "UPDATE wallets SET cash = ? WHERE ID = ?", (total_cash + amount, "TOTAL")
     )
+    
+    timestamp = datetime.datetime.now()
+    
+    cur.execute(
+        "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, N/A, ?, ?, 1)",
+        (timestamp, recid, amount)
+    )
 
     economy.commit()
     economy.close()
@@ -71,6 +78,7 @@ async def wallet_transfer(
     receiver: Union[discord.User, Literal["BANK", "TOTAL"]],
     amount: int,
     channel: discord.TextChannel,
+    transaction: int
 ) -> int:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -118,6 +126,13 @@ async def wallet_transfer(
             "UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid)
         )
         result = amount
+    
+    timestamp = datetime.datetime.now()
+    
+    cur.execute(
+        "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, ?, ?, ?, ?)",
+        (timestamp, sendid, recid, amount, transaction)
+    )
 
     economy.commit()
     economy.close()
@@ -164,7 +179,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
 
         coin_value = random.randrange(1, math.ceil(victim_money / 4 + 1))
         announce = await channel.send(
-            f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim.mention}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!",
+            f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{seeking_substr}` within 30 seconds!",
             delete_after=30,
         )
     else:
@@ -227,10 +242,10 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     except asyncio.TimeoutError:
         if anarchy:
             await channel.send(
-                f"Time's up!  No one claimed the :coin: Coins :coin: so {victim.mention}'s {coin_value}$ are going to the bank!",
+                f"Time's up!  No one claimed the :coin: Coins :coin: so {victim}'s {coin_value}$ are going to the bank!",
                 delete_after=10,
             )
-            await wallet_transfer(victim, "BANK", coin_value, channel)
+            await wallet_transfer(victim, "BANK", coin_value, channel, 3)
         else:
             await channel.send(
                 "Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...",
@@ -244,32 +259,32 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     if anarchy:
         if victim == msg.author:
             await channel.send(
-                f"{msg.author.mention} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
         else:
             await channel.send(
-                f"{msg.author.mention} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim.mention}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it, and {coin_value}$ has been split between the bank and their wallet, out of {victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
             await wallet_transfer(
-                victim, msg.author, math.ceil(coin_value / 2), channel
+                victim, msg.author, math.ceil(coin_value / 2), channel, 3
             )
-            await wallet_transfer(victim, "BANK", math.floor(coin_value / 2), channel)
+            await wallet_transfer(victim, "BANK", math.floor(coin_value / 2), channel, 3)
     else:
         if bonus:
             await channel.send(
-                f"{msg.author.mention} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
             bonus_transfer(msg.author, 100)
             bonus = False
         else:
             await channel.send(
-                f"{msg.author.mention} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
-        await wallet_transfer("BANK", msg.author, coin_value, channel)
+        await wallet_transfer("BANK", msg.author, coin_value, channel, 2)
 
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -323,7 +338,7 @@ async def tax() -> None:
 
     for userid, money in zip(userids, moneys):
         user = await bot.fetch_user(userid)
-        await wallet_transfer(user, "BANK", math.ceil(0.05 * money), channel)
+        await wallet_transfer(user, "BANK", math.ceil(0.05 * money), channel, 6)
 
     bank_money = wallet_backend("BANK")
 
@@ -384,14 +399,14 @@ async def send(ctx, receiver: discord.User, amount: int) -> None:
         if int(amount) > 0:
             if receiver.bot:
                 result = await wallet_transfer(
-                    ctx.author, "BANK", int(amount), ctx.channel
+                    ctx.author, "BANK", int(amount), ctx.channel, 5
                 )
                 await ctx.send(
                     f"{ctx.author.mention}, you're only supposed to use this command with non-bots...  Don't worry, we know you want to be generous, so your {result}$ has been sent to the bank!"
                 )
             else:
                 result = await wallet_transfer(
-                    ctx.author, receiver, int(amount), ctx.channel
+                    ctx.author, receiver, int(amount), ctx.channel, 5
                 )
                 await ctx.send(
                     f"{receiver.mention}, {ctx.author.mention} has graciously sent you {result}$!"
@@ -427,6 +442,72 @@ async def leaderboard(ctx) -> None:
         board += f"{i}. {await bot.fetch_user(row[0])}: {row[1]}$\n"
 
     await ctx.send(board)
+    
+
+@bot.hybrid_command()
+async def ledger(ctx, target: discord.User = None) -> None:
+    """
+    Displays a ledger of the ten most recent transactions from an individual
+    """
+    if target is None:
+        targetid = "BANK"
+        await ctx.send("No user given, showing ten most recent transactions...", delete_after = 10)
+    else:
+        targetid = target.id
+    
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    cur.execute("""
+    SELECT time, sender, receiver, amount, type
+    FROM ledger
+    WHERE sender IN (?) OR receiver IN (?)
+    ORDER BY time DESC
+    LIMIT 10
+    """,
+    (targetid, targetid))
+    
+    rows = cur.fetchall()
+    if not rows:
+        await ctx.send("User has no transactions!")
+        return
+
+    ledger = ""
+    transaction_dict = {
+        1 : "for solving a bonus puzzle!", # bonus puzzle
+        2 : "for solving a puzzle.", # puzzle
+        3 : ", who was a victim of an anarchy puzzle.", # anarchy puzzle
+        4 : "due to unethical behaviour.", # cheat
+        5 : ", who sent it voluntarily.", # send
+        6 : "as taxes", # tax
+    }
+    
+    for row in rows:
+        timestamp = row[0].split(".")[0]
+        
+        sendid = row[1]
+        if sendid == "BANK":
+            sender = "the bank"
+        else:
+            sender = await bot.fetch_user(int(sendid))
+            
+        recid = row[2]
+        if recid == "BANK":
+            receiver = "The bank"
+        else:
+            receiver = await bot.fetch_user(int(recid))
+            
+        amount = row[3]
+        transaction = row[4]
+        
+        if transaction == 1:
+            ledger += f"[{timestamp}] {receiver} received {amount}$ {transaction_dict[transaction]}\n"
+        else:
+            ledger += f"[{timestamp}] {receiver} received {amount}$ from {sender} {transaction_dict[transaction]}\n"
+
+    economy.close()
+    
+    await ctx.send(ledger)
 
 
 @bot.hybrid_command()
@@ -448,11 +529,11 @@ async def cheat(ctx) -> None:
     if dev:
         bank_money = wallet_backend("BANK")
         await wallet_transfer(
-            "BANK", ctx.author, math.ceil(0.99 * bank_money), ctx.channel
+            "BANK", ctx.author, math.ceil(0.99 * bank_money), ctx.channel, 4
         )
         await ctx.send("Cheat successful!")
     else:
-        result = await wallet_transfer(ctx.author, "BANK", 5, ctx.channel)
+        result = await wallet_transfer(ctx.author, "BANK", 5, ctx.channel, 4)
         await ctx.send(
             f"{ctx.author.mention}, you have successfully donated {result}$ to the bank, good job!"
         )

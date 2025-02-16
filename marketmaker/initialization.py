@@ -22,6 +22,7 @@ def ensure_db() -> None:
         cur = economy.cursor()
         cur.execute("CREATE TABLE wallets(ID TEXT, cash INTEGER DEFAULT 0)")
         cur.execute("CREATE TABLE used_words(word TEXT)")
+        cur.execute("CREATE TABLE ledger(time TIMESTAMP, sender TEXT, receiver TEXT, amount INTEGER, type INTEGER)")
         cur.execute(
             """
             INSERT INTO wallets VALUES

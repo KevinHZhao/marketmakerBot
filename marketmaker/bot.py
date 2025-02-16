@@ -349,8 +349,10 @@ async def tax() -> None:
 
 @tasks.loop(seconds=random.randint(60, 600))
 async def timed_puzzle() -> None:
-    channel = bot.get_channel(int(os.getenv("CHANNEL")))
-    await spawn_puzzle(channel)
+    global seeking_substr
+    if not seeking_substr:
+        channel = bot.get_channel(int(os.getenv("CHANNEL")))
+        await spawn_puzzle(channel)
 
 
 @bot.hybrid_command()

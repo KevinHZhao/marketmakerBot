@@ -427,6 +427,72 @@ async def leaderboard(ctx) -> None:
         board += f"{i}. {await bot.fetch_user(row[0])}: {row[1]}$\n"
 
     await ctx.send(board)
+    
+
+@bot.hybrid_command()
+async def ledger(ctx, target: discord.User = None) -> None:
+    """
+    Displays a ledger of the ten most recent transactions from an individual
+    """
+    if target is None:
+        targetid = "BANK"
+        await ctx.send("No user given, showing ten most recent transactions...", delete_after = 10)
+    else:
+        targetid = target.id
+    
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    cur.execute("""
+    SELECT time, sender, receiver, amount, type
+    FROM ledger
+    WHERE sender IN (?) OR receiver IN (?)
+    ORDER BY time DESC
+    LIMIT 10
+    """,
+    (targetid, targetid))
+    
+    rows = cur.fetchall()
+    if not rows:
+        await ctx.send("User has no transactions!")
+        return
+
+    ledger = ""
+    transaction_dict = {
+        1 : " for solving a bonus puzzle!", # bonus puzzle
+        2 : " for solving a puzzle.", # puzzle
+        3 : ", who was a victim of an anarchy puzzle.", # anarchy puzzle
+        4 : " due to unethical behaviour.", # cheat
+        5 : ", who sent it voluntarily.", # send
+        6 : " as taxes", # tax
+    }
+    
+    for row in rows:
+        timestamp = row[0].split(".")[0]
+        
+        sendid = row[1]
+        if sendid == "BANK":
+            sender = "the bank"
+        else:
+            sender = await bot.fetch_user(int(sendid))
+            
+        recid = row[2]
+        if recid == "BANK":
+            receiver = "The bank"
+        else:
+            receiver = await bot.fetch_user(int(recid))
+            
+        amount = row[3]
+        transaction = row[4]
+        
+        if transaction == 1:
+            ledger += f"[{timestamp}] {receiver} received {amount}${transaction_dict[transaction]}\n"
+        else:
+            ledger += f"[{timestamp}] {receiver} received {amount}$ from {sender}{transaction_dict[transaction]}\n"
+
+    economy.close()
+    
+    await ctx.send(ledger)
 
 
 @bot.hybrid_command()

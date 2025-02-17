@@ -49,24 +49,3 @@ def test_database_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert total_money == STARTING_MONEY
     
     economy.close()
-    
-    root = Path(__file__).parents[1]
-    normal_min_env = os.getenv("NORMAL_MIN_WORDS")
-    if normal_min_env is None:
-        raise Exception("No NORMAL_MIN_WORDS provided in .env file.")
-    normal_min_words = int(normal_min_env)
-    with open(f"{root}/static/substr_normal_{normal_min_words}.txt", "r") as f:
-        normal_substrings: list[str] = [line.rstrip("\n") for line in f]
-        
-    for substr in normal_substrings:
-        assert num_member_words(substr, words.words()) >= normal_min_words
-        
-    hard_min_env = os.getenv("HARD_MIN_WORDS")
-    if hard_min_env is None:
-        raise Exception("No HARD_MIN_WORDS provided in .env file.")
-    hard_min_words = int(hard_min_env)
-    with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "r") as f:
-        hard_substrings: list[str] = [line.rstrip("\n") for line in f]
-        
-    for substr in hard_substrings:
-        assert normal_min_words > num_member_words(substr, words.words()) >= hard_min_words

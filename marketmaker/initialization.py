@@ -63,7 +63,7 @@ def generate_counts(substrings: list[str], fpath: Path) -> None:
             substrings,
             chunksize=50,
         )
-    np.savetxt(fpath, substr_counts)
+    np.savetxt(fpath, substr_counts, fmt="%s")
 
 
 def ensure_substr() -> None:
@@ -98,7 +98,7 @@ def ensure_substr() -> None:
     if not count_fpath.is_file():
         generate_counts(substrings, count_fpath)
         
-    substr_counts = np.loadtxt(count_fpath)
+    substr_counts: list[int] = np.loadtxt(count_fpath, dtype = int).tolist()
 
     create_substr(substr_counts, substrings, normal_fpath, "medium", normal_min_words)
     create_substr(substr_counts, substrings, hard_fpath, "hard", hard_min_words, normal_min_words)

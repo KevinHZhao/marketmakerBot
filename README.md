@@ -11,6 +11,10 @@ The `-e` denotes an EDITABLE install, meaning you can change the code and run th
 
 **If you add dependencies to the project, please update `pyproject.toml` and re-run step 4.**
 
+### Development Mode Install
+
+Use `pip install -e .[dev]`. This installs additional dependencies for development, namely pytest
+
 ## Configuration
 
 Create a file called `.env` with the following format:
@@ -30,6 +34,10 @@ AUTHOR=... # discord user id of the bot's author (may not be necessary)
 
 1. Ensure the virtual environment is activated.
 2. Run `bot`
+
+## Running Test Suite
+
+Run `pytest`.
 
 ## Project Layout
 

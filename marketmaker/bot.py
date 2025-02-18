@@ -626,7 +626,10 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     await wallet_transfer(ctx.author, "BANK", wager, ctx.channel, 7)
     
     await ctx.send(f"{ctx.author.mention}, your wager of {wager}$ has been accepted by the bank.  Now rolling the dice...")
+    
+    user_money = wallet_backend(ctx.author.id)
     bank_money = wallet_backend("BANK")
+    
     all_puzzle = partial(spawn_puzzle, channel = ctx.channel, anarchy_override = True, anarchy_victim = ctx.author)
     normal_puzzle = partial(spawn_puzzle, channel = ctx.channel)
     

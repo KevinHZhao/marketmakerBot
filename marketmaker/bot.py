@@ -87,13 +87,13 @@ async def force_anarchy(channel: discord.TextChannel):
 
 async def force_deflation(channel: discord.TextChannel, user: discord.User, amount: int):
     user_cash = wallet_backend(user.id)
-    assert user_cash >= amount
+    if user_cash < amount:
+        raise Exception(f"Something went wrong, amount {amount} is not less than user_cash {user_cash}.")
     await channel.send(f"Deflation!  {amount}$ of {user.mention}'s cash has been lost!  The economy shrinks by {amount}$.")
     bonus_transfer(user, -amount, 9)
     
     
 async def force_inflation(channel: discord.TextChannel, user: discord.User, amount: int):
-    user_cash = wallet_backend(user.id)
     await channel.send(f"Bonus inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.")
     bonus_transfer(user, amount, 8)
 

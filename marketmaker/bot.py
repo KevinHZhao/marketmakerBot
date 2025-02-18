@@ -637,8 +637,8 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
     buffed_puzzle = partial(spawn_puzzle, channel = ctx.channel, coin_value = buffed_value, bonus_value = 500)
     
-    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager/2))
-    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
+    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
+    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager/2))
     dono = min(math.ceil(wager/2), user_money)
     bank_donation = partial(donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = dono)
     

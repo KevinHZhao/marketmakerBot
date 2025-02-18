@@ -596,7 +596,7 @@ async def cmd_ledger(ctx, target: Optional[discord.User]) -> None:
         if transaction in [1, 8]:
             ledger += f"[{timestamp}] {receiver} received {amount}${transaction_dict[transaction]}\n"
         elif transaction == 9:
-            ledger += f"[{timestamp}] {receiver} lost {amount}${transaction_dict[transaction]}\n"
+            ledger += f"[{timestamp}] {receiver} lost {-amount}${transaction_dict[transaction]}\n"
         else:
             ledger += f"[{timestamp}] {receiver} received {amount}$ from {sender}{transaction_dict[transaction]}\n"
 

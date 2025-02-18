@@ -48,14 +48,14 @@ prefix = "##"
 bot = MarketmakerBot(command_prefix=prefix, intents=intents)
 
 
-def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int, transaction: int = 1) -> None:
+def bonus_transfer(receiver: Union[discord.Member, Literal["BANK"]], amount: int, transaction: int = 1) -> None:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
     if isinstance(receiver, (discord.User, discord.Member)):
         recid: Union[Literal["BANK"], int] = receiver.id
     elif receiver != "BANK":
-        raise Exception("receiver is neither discord.User nor BANK!")
+        raise Exception("receiver is neither discord.Member nor BANK!")
     else:
         recid = "BANK"
 
@@ -86,17 +86,17 @@ async def force_anarchy(channel: discord.TextChannel):
     bot.game_vars.anarchy = True
 
 
-async def force_deflation(channel: discord.TextChannel, user: discord.User, amount: int):
+async def force_deflation(channel: discord.TextChannel, user: discord.Member, amount: int):
     await channel.send(f"Deflation!  {amount}$ of {user.mention}'s wagered cash has disappeared from the bank!  The economy shrinks by {amount}$.")
     bonus_transfer("BANK", -amount, 9)
     
     
-async def force_inflation(channel: discord.TextChannel, user: discord.User, amount: int):
+async def force_inflation(channel: discord.TextChannel, user: discord.Member, amount: int):
     await channel.send(f"Inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.")
     bonus_transfer(user, amount, 8)
 
 
-async def donation(channel:discord.TextChannel, sender: discord.User, receiver: Union[discord.User, Literal["BANK"]], amount: int):
+async def donation(channel:discord.TextChannel, sender: discord.Member, receiver: Union[discord.Member, Literal["BANK"]], amount: int):
     if receiver == "BANK":
         await channel.send(f"{sender.mention} must be feeling generous, since they just donated a further {amount}$ to the bank on top of their initial wager!")
     else:
@@ -106,8 +106,8 @@ async def donation(channel:discord.TextChannel, sender: discord.User, receiver: 
 
 
 async def wallet_transfer(
-    sender: Union[discord.User, Literal["BANK"]],
-    receiver: Union[discord.User, Literal["BANK"]],
+    sender: Union[discord.Member, Literal["BANK"]],
+    receiver: Union[discord.Member, Literal["BANK"]],
     amount: int,
     channel: discord.TextChannel,
     transaction: int
@@ -118,14 +118,14 @@ async def wallet_transfer(
     if isinstance(receiver, (discord.User, discord.Member)):
         recid: Union[Literal["BANK"], int] = receiver.id
     elif receiver != "BANK":
-        raise Exception("receiver is neither discord.User nor BANK")
+        raise Exception("receiver is neither discord.Member nor BANK")
     else:
         recid = "BANK"
         
     if isinstance(sender, (discord.User, discord.Member)):
         sendid: Union[Literal["BANK"], int] = sender.id
     elif sender != "BANK":
-        raise Exception("sender is neither discord.User nor BANK")
+        raise Exception("sender is neither discord.Member nor BANK")
     else:
         sendid = "BANK"
 
@@ -135,14 +135,14 @@ async def wallet_transfer(
         if isinstance(sender, (discord.User, discord.Member)):
             sendmen = sender.mention
         elif sender != "BANK":
-            raise Exception("sender is neither discord.User nor BANK")
+            raise Exception("sender is neither discord.Member nor BANK")
         else:
             sendmen = "The bank"
 
         if isinstance(receiver, (discord.User, discord.Member)):
             recmen = receiver.mention
         elif receiver != "BANK":
-            raise Exception("receiver is neither discord.User nor BANK")
+            raise Exception("receiver is neither discord.Member nor BANK")
         else:
             recmen = "the bank"
 
@@ -185,7 +185,7 @@ async def wallet_transfer(
     return result
 
 
-async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] = None, bonus_value: int = 100, anarchy_override: bool = False, anarchy_victim: Optional[discord.User] = None) -> None:
+async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] = None, bonus_value: int = 100, anarchy_override: bool = False, anarchy_victim: discord.Member = None) -> None:
     bank_money = wallet_backend("BANK")
     total_money = wallet_backend("TOTAL")
     used_words = used_words_backend()
@@ -440,7 +440,7 @@ async def timed_puzzle() -> None:
 
 
 @bot.hybrid_command(name="wallet")
-async def cmd_wallet(ctx, target: Optional[discord.User] = None) -> None:
+async def cmd_wallet(ctx, target: discord.Member = None) -> None:
     """
     Displays a selected user's wallet.  Defaults to command user.
     """
@@ -477,7 +477,7 @@ async def cmd_bank(ctx) -> None:
 
 
 @bot.hybrid_command(name="send")
-async def cmd_send(ctx, receiver: discord.User, amount: int) -> None:
+async def cmd_send(ctx, receiver: discord.Member, amount: int) -> None:
     """
     Sends a user an amount of money.
     """
@@ -531,7 +531,7 @@ async def cmd_leaderboard(ctx) -> None:
     
 
 @bot.hybrid_command(name="ledger")
-async def cmd_ledger(ctx, target: Optional[discord.User]) -> None:
+async def cmd_ledger(ctx, target: discord.Member = None) -> None:
     """
     Displays a ledger of the ten most recent transactions from an individual
     """
@@ -578,7 +578,7 @@ async def cmd_ledger(ctx, target: Optional[discord.User]) -> None:
         
         sendid = row[1]
         if sendid == "BANK":
-            sender: Union[Literal["the bank"], discord.User, None] = "the bank"
+            sender: Union[Literal["the bank"], discord.Member, None] = "the bank"
         elif sendid == "N/A":
             sender = None
         else:
@@ -586,7 +586,7 @@ async def cmd_ledger(ctx, target: Optional[discord.User]) -> None:
             
         recid = row[2]
         if recid == "BANK":
-            receiver: Union[Literal["The bank"], discord.User] = "The bank"
+            receiver: Union[Literal["The bank"], discord.Member] = "The bank"
         else:
             receiver = await bot.fetch_user(int(recid))
             

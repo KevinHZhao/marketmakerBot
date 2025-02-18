@@ -44,7 +44,8 @@ time = datetime.time(hour=5, minute=0, tzinfo=datetime.UTC)
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = MarketmakerBot(command_prefix="##", intents=intents)
+prefix = "##"
+bot = MarketmakerBot(command_prefix=prefix, intents=intents)
 
 
 def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int, transaction: int = 1) -> None:
@@ -86,15 +87,12 @@ async def force_anarchy(channel: discord.TextChannel):
 
 
 async def force_deflation(channel: discord.TextChannel, user: discord.User, amount: int):
-    user_cash = wallet_backend(user.id)
-    if user_cash < amount:
-        raise Exception(f"Something went wrong, amount {amount} is not less than user_cash {user_cash}.")
-    await channel.send(f"Deflation!  {amount}$ of {user.mention}'s cash has been lost!  The economy shrinks by {amount}$.")
-    bonus_transfer(user, -amount, 9)
+    await channel.send(f"Deflation!  {amount}$ of {user.mention}'s wagered cash has disappeared from the bank!  The economy shrinks by {amount}$.")
+    bonus_transfer("BANK", -amount, 9)
     
     
 async def force_inflation(channel: discord.TextChannel, user: discord.User, amount: int):
-    await channel.send(f"Bonus inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.")
+    await channel.send(f"Inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.")
     bonus_transfer(user, amount, 8)
 
 
@@ -326,12 +324,12 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
     if bot.game_vars.anarchy or anarchy_override:
         if bot.game_vars.victim == msg.author:
             await channel.send(
-                f"{msg.author} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it (took {elapsed_time:.2f} sec), so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
         else:
             await channel.send(
-                f"{msg.author} got it, and {coin_value}$ has been split between the bank and their wallet, out of {bot.game_vars.victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value}$ has been split between the bank and their wallet, out of {bot.game_vars.victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
             
@@ -343,14 +341,14 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
     else:
         if bonus:
             await channel.send(
-                f"{msg.author} got it, and {coin_value + bonus_value}$ has been deposited into their wallet!  The economy has just grown by {bonus_value}$!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value + bonus_value}$ has been deposited into their wallet!  The economy has just grown by {bonus_value}$!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
             bonus_transfer(msg.author, bonus_value)
             bonus = False
         else:
             await channel.send(
-                f"{msg.author} got it, and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
         await wallet_transfer("BANK", msg.author, coin_value, channel, 2)
@@ -385,6 +383,9 @@ async def on_message(message) -> None:
         return
 
     await bot.process_commands(message)
+    
+    if message.content.startswith(prefix):
+        return
 
     if random.randrange(100) < prob_coin and bot.game_vars.seeking_substr == "" and message.guild:
         await spawn_puzzle(message.channel)
@@ -636,10 +637,10 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
     buffed_puzzle = partial(spawn_puzzle, channel = ctx.channel, coin_value = buffed_value, bonus_value = 500)
     
-    bonus = min(math.ceil(wager/2), user_money)
-    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = bonus)
-    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = bonus)
-    bank_donation = partial(donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = bonus)
+    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager/2))
+    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
+    dono = min(math.ceil(wager/2), user_money)
+    bank_donation = partial(donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = dono)
     
     anarchy = partial(force_anarchy, channel = ctx.channel)
     

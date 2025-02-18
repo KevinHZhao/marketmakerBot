@@ -7,7 +7,7 @@ import os
 import random
 import sqlite3
 from pathlib import Path
-from typing import Literal, Union, Optional, Tuple
+from typing import Literal, Union, Optional
 
 import discord
 import enchant

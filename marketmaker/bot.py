@@ -7,13 +7,14 @@ import os
 import random
 import sqlite3
 from pathlib import Path
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, Tuple
 
 import discord
 import enchant
 from discord.ext import tasks
 from dotenv import load_dotenv
 from pytz import timezone
+from functools import partial
 
 from marketmaker.backend import used_words_backend, wallet_backend
 from marketmaker.initialization import ensure_db, ensure_substr
@@ -46,7 +47,7 @@ intents.message_content = True
 bot = MarketmakerBot(command_prefix="##", intents=intents)
 
 
-def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) -> None:
+def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int, transaction: int = 1) -> None:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
@@ -70,13 +71,40 @@ def bonus_transfer(receiver: Union[discord.User, Literal["BANK"]], amount: int) 
     timestamp = datetime.datetime.now(timezone("US/Eastern"))
     
     cur.execute(
-        "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, 'N/A', ?, ?, 1)",
-        (timestamp, recid, amount)
+        "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, 'N/A', ?, ?, ?)",
+        (timestamp, recid, amount, transaction)
     )
 
     economy.commit()
     economy.close()
     print(f"Gave {amount} to {receiver} as a bonus.")
+    
+    
+async def force_anarchy(channel: discord.TextChannel):
+    await channel.send("Anarchy has been forcibly activated!")
+    bot.game_vars.anarchy = True
+
+
+async def force_deflation(channel: discord.TextChannel, user: discord.User, amount: int):
+    user_cash = wallet_backend(user.id)
+    assert user_cash >= amount
+    await channel.send(f"Deflation!  {amount}$ of {user.mention}'s cash has been lost!  The economy shrinks by {amount}$.")
+    bonus_transfer(user, -amount, 9)
+    
+    
+async def force_inflation(channel: discord.TextChannel, user: discord.User, amount: int):
+    user_cash = wallet_backend(user.id)
+    await channel.send(f"Bonus inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.")
+    bonus_transfer(user, amount, 8)
+
+
+async def donation(channel:discord.TextChannel, sender: discord.User, receiver: Union[discord.User, Literal["BANK"]], amount: int):
+    if receiver == "BANK":
+        await channel.send(f"{sender.mention} must be feeling generous, since they just donated a further {amount}$ to the bank on top of their initial wager!")
+    else:
+        await channel.send(f"{sender.mention} must be feeling generous, since they just donated {amount}$ to {receiver.mention}!")
+    
+    await wallet_transfer(sender, receiver, amount, channel, 5)
 
 
 async def wallet_transfer(
@@ -159,9 +187,7 @@ async def wallet_transfer(
     return result
 
 
-async def spawn_puzzle(channel: discord.TextChannel) -> None:
-    daily_counter = bot.game_vars.daily_counter
-
+async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] = None, bonus_value: int = 100, anarchy_override: bool = False, anarchy_victim: Optional[discord.User] = None) -> None:
     bank_money = wallet_backend("BANK")
     total_money = wallet_backend("TOTAL")
     used_words = used_words_backend()
@@ -182,7 +208,21 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         normal_substrings = [line.rstrip("\n") for line in f]
 
     bot.game_vars.seeking_substr = random.choice(normal_substrings)
-    if bot.game_vars.anarchy:
+    
+    if anarchy_override:
+        assert anarchy_victim is not None
+        victim_money = wallet_backend(anarchy_victim.id)
+        if victim_money == 0:
+            await channel.send(f"We were going to put all of {anarchy_victim.mention}'s money up for a puzzle, but they don't have any left!  Nothing happens...", delete_after=20)
+            return
+        bot.game_vars.victim = anarchy_victim
+        coin_value = victim_money
+        
+        announce = await channel.send(
+            f"{bot.game_vars.victim.mention}, all {coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
+            delete_after=30,
+        )
+    elif bot.game_vars.anarchy:
         economy = sqlite3.connect("marketmaker.db")
         cur = economy.cursor()
 
@@ -196,15 +236,16 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
         bot.game_vars.victim = await bot.fetch_user(victim_row[0])
         victim_money = victim_row[1]
         economy.close()
-
         coin_value = random.randrange(1, math.ceil(victim_money / 4 + 1))
+            
         announce = await channel.send(
             f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {bot.game_vars.victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
             delete_after=30,
         )
     else:
-        coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
-        if daily_counter > 0 and random.randrange(10) == 9:
+        if coin_value is None:
+            coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
+        if bot.game_vars.daily_counter > 0 and random.randrange(10) == 9:
             print("BONUS TIME")
             
             hard_min_words_env = os.getenv("HARD_MIN_WORDS")
@@ -217,7 +258,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
 
             bot.game_vars.seeking_substr = random.choice(hard_substrings)
             announce = await channel.send(
-                f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + 100}$!  You can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
+                f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + bonus_value}$!  You can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
                 delete_after=30,
             )
             bonus = True
@@ -270,6 +311,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
                 delete_after=10,
             )
             assert bot.game_vars.victim is not None
+            assert isinstance(coin_value, int)
             await wallet_transfer(bot.game_vars.victim, "BANK", coin_value, channel, 3)
         else:
             await channel.send(
@@ -281,7 +323,7 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
 
     await announce.delete()
     await msg.add_reaction("👍")
-    if bot.game_vars.anarchy:
+    if bot.game_vars.anarchy or anarchy_override:
         if bot.game_vars.victim == msg.author:
             await channel.send(
                 f"{msg.author} got it, so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
@@ -301,10 +343,10 @@ async def spawn_puzzle(channel: discord.TextChannel) -> None:
     else:
         if bonus:
             await channel.send(
-                f"{msg.author} got it, and {coin_value + 100}$ has been deposited into their wallet!  The economy has just grown by 100$!  `{msg.content.lower()}` has now been added to the list of used words.",
+                f"{msg.author} got it, and {coin_value + bonus_value}$ has been deposited into their wallet!  The economy has just grown by {bonus_value}$!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
-            bonus_transfer(msg.author, 100)
+            bonus_transfer(msg.author, bonus_value)
             bonus = False
         else:
             await channel.send(
@@ -344,7 +386,7 @@ async def on_message(message) -> None:
 
     await bot.process_commands(message)
 
-    if random.randrange(100) < prob_coin and not bot.game_vars.seeking_substr and message.guild:
+    if random.randrange(100) < prob_coin and bot.game_vars.seeking_substr == "" and message.guild:
         await spawn_puzzle(message.channel)
 
 
@@ -384,7 +426,7 @@ async def tax() -> None:
 
 @tasks.loop(seconds=random.randint(60, 600))
 async def timed_puzzle() -> None:
-    if not bot.game_vars.seeking_substr:
+    if bot.game_vars.seeking_substr == "":
         channel_env = os.getenv("CHANNEL")
         if channel_env is None:
             raise Exception("No CHANNEL provided in .env file.")
@@ -396,8 +438,8 @@ async def timed_puzzle() -> None:
         await spawn_puzzle(channel)
 
 
-@bot.hybrid_command()
-async def wallet(ctx, target: Optional[discord.User] = None) -> None:
+@bot.hybrid_command(name="wallet")
+async def cmd_wallet(ctx, target: Optional[discord.User] = None) -> None:
     """
     Displays a selected user's wallet.  Defaults to command user.
     """
@@ -407,8 +449,8 @@ async def wallet(ctx, target: Optional[discord.User] = None) -> None:
     await ctx.send(f"{target} has {money}$ in their wallet!")
 
 
-@bot.hybrid_command()
-async def used(ctx) -> None:
+@bot.hybrid_command(name="used")
+async def cmd_used(ctx) -> None:
     """
     Displays all previously used words in the game.
     """
@@ -421,8 +463,8 @@ async def used(ctx) -> None:
     await ctx.send(words_string)
 
 
-@bot.hybrid_command()
-async def bank(ctx) -> None:
+@bot.hybrid_command(name="bank")
+async def cmd_bank(ctx) -> None:
     """
     Displays the current money in the bank and the total money in the economy.
     """
@@ -433,8 +475,8 @@ async def bank(ctx) -> None:
     )
 
 
-@bot.hybrid_command()
-async def send(ctx, receiver: discord.User, amount: int) -> None:
+@bot.hybrid_command(name="send")
+async def cmd_send(ctx, receiver: discord.User, amount: int) -> None:
     """
     Sends a user an amount of money.
     """
@@ -460,8 +502,8 @@ async def send(ctx, receiver: discord.User, amount: int) -> None:
         await ctx.send("Error, please enter a valid amount.")
 
 
-@bot.hybrid_command()
-async def leaderboard(ctx) -> None:
+@bot.hybrid_command(name="leaderboard")
+async def cmd_leaderboard(ctx) -> None:
     """
     Displays a leaderboard of up to ten users based on their current wallet.
     """
@@ -487,8 +529,8 @@ async def leaderboard(ctx) -> None:
     await ctx.send(board)
     
 
-@bot.hybrid_command()
-async def ledger(ctx, target: Optional[discord.User]) -> None:
+@bot.hybrid_command(name="ledger")
+async def cmd_ledger(ctx, target: Optional[discord.User]) -> None:
     """
     Displays a ledger of the ten most recent transactions from an individual
     """
@@ -523,8 +565,11 @@ async def ledger(ctx, target: Optional[discord.User]) -> None:
         2 : " for solving a puzzle.", # puzzle
         3 : ", who was a victim of an anarchy puzzle.", # anarchy puzzle
         4 : " due to unethical behaviour.", # cheat
-        5 : ", who sent it voluntarily.", # send
-        6 : " as taxes", # tax
+        5 : " as a donation.", # send/donate
+        6 : " as taxes.", # tax
+        7 : " as a wager.", # random
+        8 : " as a bonus.", # force_inflation
+        9 : " due to deflation." # force_deflataion
     }
     
     for row in rows:
@@ -547,8 +592,10 @@ async def ledger(ctx, target: Optional[discord.User]) -> None:
         amount = row[3]
         transaction = row[4]
         
-        if transaction == 1:
+        if transaction in [1, 8]:
             ledger += f"[{timestamp}] {receiver} received {amount}${transaction_dict[transaction]}\n"
+        elif transaction == 9:
+            ledger += f"[{timestamp}] {receiver} lost {amount}${transaction_dict[transaction]}\n"
         else:
             ledger += f"[{timestamp}] {receiver} received {amount}$ from {sender}{transaction_dict[transaction]}\n"
 
@@ -557,8 +604,68 @@ async def ledger(ctx, target: Optional[discord.User]) -> None:
     await ctx.send(ledger)
 
 
-@bot.hybrid_command()
-async def force_tax(ctx) -> None:
+@bot.hybrid_command(name="random")
+async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
+    """
+    Causes a random event to occur, requires a wager rom the user.
+    """
+    if wager <= 0:
+        await ctx.send(f"{ctx.author.mention}, you must provide a positive integer wager!")
+        return
+    
+    if bot.game_vars.seeking_substr != "":
+        await ctx.send(f"{ctx.author.mention}, wait for the current puzzle to end before using this command!")
+        return
+    
+    user_money = wallet_backend(ctx.author.id)
+    assert isinstance(wager, int)
+    if wager > user_money:
+        await ctx.send(f"{ctx.author.mention}, you don't have enough money for that wager!")
+        return
+    
+    await wallet_transfer(ctx.author, "BANK", wager, ctx.channel, 7)
+    
+    await ctx.send(f"{ctx.author.mention}, your wager of {wager}$ has been accepted by the bank.  Now rolling the dice...")
+    bank_money = wallet_backend("BANK")
+    all_puzzle = partial(spawn_puzzle, channel = ctx.channel, anarchy_override = True, anarchy_victim = ctx.author)
+    normal_puzzle = partial(spawn_puzzle, channel = ctx.channel)
+    
+    buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
+    buffed_puzzle = partial(spawn_puzzle, channel = ctx.channel, coin_value = buffed_value, bonus_value = 500)
+    
+    bonus = min(math.ceil(wager/2), user_money)
+    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = bonus)
+    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = bonus)
+    bank_donation = partial(donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = bonus)
+    
+    anarchy = partial(force_anarchy, channel = ctx.channel)
+    
+    funcs = [all_puzzle, normal_puzzle, buffed_puzzle, anarchy, deflation, inflation, bank_donation, tax]
+    
+    # Create weights for funcs depending on wager
+    if wager < 100:
+        weights = (0.05, 0.4, 0.02, 0.03, 0.025, 0.025, 0.4, 0.05)
+    elif 100 <= wager < 250:
+        weights = (0.04, 0.25, 0.3, 0.05, 0.04, 0.04, 0.23, 0.05)
+    elif 250 <= wager < 500:
+        weights = (0.03, 0.15, 0.4, 0.07, 0.08, 0.08, 0.16, 0.03)
+    elif 500 <= wager < 1000:
+        weights = (0.02, 0.1, 0.5, 0.07, 0.08, 0.08, 0.13, 0.02)
+    else:
+        weights = (0.01, 0, 0.6, 0.13, 0.13, 0.13, 0, 0)
+    
+    selected_fun = random.choices(
+        funcs,
+        weights = weights,
+        k = 1
+    )[0]
+    
+    await selected_fun()
+    
+
+
+@bot.hybrid_command(name="force_tax")
+async def cmd_force_tax(ctx) -> None:
     """
     Developer command, forces taxation on all users.
     """
@@ -568,8 +675,8 @@ async def force_tax(ctx) -> None:
         await ctx.send("No.")
 
 
-@bot.hybrid_command()
-async def cheat(ctx) -> None:
+@bot.hybrid_command(name="cheat")
+async def cmd_cheat(ctx) -> None:
     """
     Developer command, steals 99% of the bank's money and deposits it in user's wallet.
     """

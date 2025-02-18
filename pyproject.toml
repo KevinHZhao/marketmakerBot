@@ -13,6 +13,7 @@ dependencies = [
     "pyenchant",     # spell checking
     "numpy",         # saving int lists
     "pytz",          # timezone
+    "discord-ext-menus @ git+https://github.com/Rapptz/discord-ext-menus", # discord menus
 ]
 requires-python = ">=3.11"
 readme = "README.md"

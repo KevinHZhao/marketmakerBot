@@ -56,7 +56,7 @@ def timer_board_add(userid: int, sol_time: float, word: str, substr: str) -> Non
     cur.execute("SELECT time FROM timeboard WHERE ID = ?", (userid,))
     prev_time = cur.fetchone()[0]
     if sol_time < prev_time:
-        cur.execute("INSERT INTO timeboard (ID, time, word, substr) VALUES (?, ?, ?, ?)", (userid, sol_time, word, substr))
+        cur.execute("UPDATE timeboard SET time = ?, word = ?, substr = ? WHERE ID = ?", (sol_time, word, substr, userid))
     
     economy.commit()
     economy.close()

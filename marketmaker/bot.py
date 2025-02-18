@@ -19,6 +19,7 @@ from functools import partial
 from marketmaker.backend import used_words_backend, wallet_backend
 from marketmaker.initialization import ensure_db, ensure_substr
 from marketmaker.subclass import MarketmakerBot
+from marketmaker.used_menus import MySource, MyMenuPages
 
 dict = enchant.Dict("en_CA")
 
@@ -455,13 +456,19 @@ async def cmd_used(ctx) -> None:
     """
     Displays all previously used words in the game.
     """
-    used_words = used_words_backend()
+    used_words = sorted(used_words_backend())
+    num_used = len(used_words)
+    wpp = 30 # words per page
 
-    words_string = ""
-    for word in used_words:
-        words_string += "`" + word + "`, "
-    words_string = words_string[:-2] + "."
-    await ctx.send(words_string)
+    words_strings = [""] * math.ceil(num_used/wpp)
+    for i, word in zip(range(num_used), used_words):
+        words_strings[i//wpp] += "`" + word + "`, "
+    
+    words_strings = [string[:-2] + "." for string in words_strings]
+    
+    formatter = MySource(words_strings, per_page = 1)
+    menu = MyMenuPages(formatter)
+    await menu.start(ctx)
 
 
 @bot.hybrid_command(name="bank")
@@ -665,7 +672,6 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     )[0]
     
     await selected_fun()
-    
 
 
 @bot.hybrid_command(name="force_tax")

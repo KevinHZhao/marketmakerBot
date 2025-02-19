@@ -25,10 +25,11 @@ from marketmaker.db import (
 from marketmaker.initialization import ensure_db, ensure_substr
 from marketmaker.subclass import MarketmakerBot
 from marketmaker.used_menus import MyMenuPages, MySource
+from marketmaker.actions import fish_react
 
 dict = enchant.Dict("en_CA")
 
-load_dotenv()
+load_dotenv(override = True)
 
 # Setup
 prob_coin_env = os.getenv("PROB")
@@ -705,20 +706,22 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     
     anarchy = partial(force_anarchy, channel = ctx.channel)
     taxation = partial(tax, channel = ctx.channel)
+    history = [msg async for msg in ctx.channel.history(limit = 5)]
+    fish = partial(fish_react, message = random.choice(history))
     
-    funcs = [all_puzzle, normal_puzzle, buffed_puzzle, anarchy, deflation, inflation, bank_donation, taxation]
+    funcs = [all_puzzle, normal_puzzle, buffed_puzzle, anarchy, deflation, inflation, bank_donation, taxation, fish]
     
     # Create weights for funcs depending on wager
     if wager < 100:
-        weights = (0.05, 0.4, 0.02, 0.03, 0.025, 0.025, 0.4, 0.05)
+        weights = (0.05, 0.1, 0.02, 0.03, 0.025, 0.025, 0.4, 0.05, 0.3)
     elif 100 <= wager < 250:
-        weights = (0.04, 0.25, 0.3, 0.05, 0.04, 0.04, 0.23, 0.05)
+        weights = (0.04, 0.15, 0.15, 0.05, 0.04, 0.04, 0.23, 0.05, 0.25)
     elif 250 <= wager < 500:
-        weights = (0.03, 0.15, 0.4, 0.07, 0.08, 0.08, 0.16, 0.03)
+        weights = (0.03, 0.1, 0.3, 0.07, 0.08, 0.08, 0.16, 0.03, 0.15)
     elif 500 <= wager < 1000:
-        weights = (0.02, 0.1, 0.5, 0.07, 0.08, 0.08, 0.13, 0.02)
+        weights = (0.02, 0.1, 0.4, 0.07, 0.08, 0.08, 0.13, 0.02, 0.1)
     else:
-        weights = (0.01, 0, 0.6, 0.13, 0.13, 0.13, 0, 0)
+        weights = (0.01, 0, 0.6, 0.11, 0.13, 0.13, 0, 0, 0.02)
 
     selected_fun = random.choices(funcs, weights=weights, k=1)[0]
 

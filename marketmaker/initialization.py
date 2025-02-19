@@ -68,7 +68,7 @@ def generate_counts(substrings: list[str], fpath: Path) -> None:
 
 def ensure_substr() -> None:
     """Ensures that substring lists are initialized."""
-    load_dotenv()
+    load_dotenv(override = True)
 
     static_dir = Path(__file__).parents[1] / "static"
 

@@ -18,8 +18,10 @@ async def test_fish_react(channel: TextChannel, event_loop):
     await fish_react(message)
 
     # check if the message has the fish reaction; re-fetch
+    FISH = ["🐟", "🐠", "🐡", "🎣", "🦈"]
     message = await channel.fetch_message(message.id)
-    assert any(reaction.emoji == "🐟" for reaction in message.reactions)
+    for fish in FISH:
+        assert any(reaction.emoji == fish for reaction in message.reactions)
 
     # check if the bot sent a message
     history = [msg async for msg in channel.history(limit=1)]

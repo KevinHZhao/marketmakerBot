@@ -13,7 +13,9 @@ async def fish_react(message: Message) -> None:
         The message to react to.
 
     """
-    FISH = "🐟"
+    FISH = ["🐟", "🐠", "🐡", "🎣", "🦈"]
     GIF_LINK = "https://tenor.com/view/fish-react-fish-react-him-thanos-gif-26859685"
-    await message.add_reaction(FISH)
+    for fish in FISH:
+        await message.add_reaction(fish)
+
     await message.channel.send(GIF_LINK)

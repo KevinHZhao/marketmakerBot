@@ -8,7 +8,7 @@ from pathlib import Path
 DB_PATH = Path("marketmaker.db")  # relative to executable
 
 
-def wallet_backend(target_id: int | Literal["BANK", "TOTAL"]) -> int:
+def fetch_wallet_amount(target_id: int | Literal["BANK", "TOTAL"]) -> int:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
@@ -25,7 +25,7 @@ def wallet_backend(target_id: int | Literal["BANK", "TOTAL"]) -> int:
     return money
 
 
-def used_words_backend() -> list[str]:
+def fetch_used_words() -> list[str]:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 

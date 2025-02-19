@@ -8,6 +8,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+  TEST_GUILD_ID: ${{ secrets.TEST_GUILD_ID }}
+
 jobs:
   build:
     name: Automated Test Suite
@@ -26,4 +30,4 @@ jobs:
         python -m pip install -e .[dev]
     - name: Test with pytest
       run: |
-        pytest
+        pytest --run-bot

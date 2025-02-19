@@ -16,9 +16,15 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 from pytz import timezone
 
-from marketmaker.db import fetch_used_words, fetch_wallet_amount
+from marketmaker.db import (
+    fetch_used_words,
+    fetch_wallet_amount,
+    reset_timer_board,
+    timer_board_add,
+)
 from marketmaker.initialization import ensure_db, ensure_substr
 from marketmaker.subclass import MarketmakerBot
+from marketmaker.used_menus import MyMenuPages, MySource
 
 dict = enchant.Dict("en_CA")
 
@@ -81,8 +87,31 @@ def bonus_transfer(
     economy.commit()
     economy.close()
     print(f"Gave {amount} to {receiver} as a bonus.")
+    
+    
+async def tax(channel: discord.TextChannel) -> None:
+    print("Taxation time!")
 
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    cur.execute("SELECT ID FROM wallets WHERE ID NOT IN ('BANK', 'TOTAL')")
+    userids = [row[0] for row in cur.fetchall()]
 
+    cur.execute("SELECT cash FROM wallets WHERE ID NOT IN ('BANK', 'TOTAL')")
+    moneys = [row[0] for row in cur.fetchall()]
+    economy.close()
+
+    for userid, money in zip(userids, moneys):
+        user = await bot.fetch_user(userid)
+        await wallet_transfer(user, "BANK", math.ceil(0.05 * money), channel, 6)
+
+    bank_money = fetch_wallet_amount("BANK")
+
+    await channel.send(
+        f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!"
+    )
+    
+    
 async def force_anarchy(channel: discord.TextChannel):
     await channel.send("Anarchy has been forcibly activated!")
     bot.game_vars.anarchy = True
@@ -383,6 +412,8 @@ async def spawn_puzzle(
             )
         await wallet_transfer("BANK", msg.author, coin_value, channel, 2)
 
+    timer_board_add(msg.author.id, elapsed_time, msg.content.lower(), bot.game_vars.seeking_substr)
+    
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
     cur.execute("INSERT INTO used_words VALUES (?)", (msg.content.lower(),))
@@ -403,7 +434,7 @@ async def on_ready() -> None:
 
     if timed:
         timed_puzzle.start()
-    tax.start()
+    daily_events.start()
     await bot.tree.sync()
 
 
@@ -426,37 +457,17 @@ async def on_message(message) -> None:
 
 
 @tasks.loop(time=time)
-async def tax() -> None:
-    print("Taxation time!")
-
+async def daily_events() -> None:
+    print("Daily reset!")
     bot.game_vars.daily_counter = 3
 
     channel_env = os.getenv("CHANNEL")
     if channel_env is None:
         raise Exception("No CHANNEL provided in .env file.")
-    channel = await bot.fetch_channel(int(channel_env))
-
-    if not isinstance(channel, discord.TextChannel):
-        raise Exception("Provided CHANNEL points to a non-text channel.")
-
-    economy = sqlite3.connect("marketmaker.db")
-    cur = economy.cursor()
-    cur.execute("SELECT ID FROM wallets WHERE ID NOT IN ('BANK', 'TOTAL')")
-    userids = [row[0] for row in cur.fetchall()]
-
-    cur.execute("SELECT cash FROM wallets WHERE ID NOT IN ('BANK', 'TOTAL')")
-    moneys = [row[0] for row in cur.fetchall()]
-    economy.close()
-
-    for userid, money in zip(userids, moneys):
-        user = await bot.fetch_user(userid)
-        await wallet_transfer(user, "BANK", math.ceil(0.05 * money), channel, 6)
-
-    bank_money = fetch_wallet_amount("BANK")
-
-    await channel.send(
-        f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!"
-    )
+    channel: discord.TextChannel = await bot.fetch_channel(int(channel_env))
+    
+    await tax(channel)
+    await reset_timer_board(channel)
 
 
 @tasks.loop(seconds=random.randint(60, 600))
@@ -489,13 +500,19 @@ async def cmd_used(ctx) -> None:
     """
     Displays all previously used words in the game.
     """
-    used_words = fetch_used_words()
+    used_words = sorted(fetch_used_words())
+    num_used = len(used_words)
+    wpp = 30 # words per page
 
-    words_string = ""
-    for word in used_words:
-        words_string += "`" + word + "`, "
-    words_string = words_string[:-2] + "."
-    await ctx.send(words_string)
+    words_strings = [""] * math.ceil(num_used/wpp)
+    for i, word in zip(range(num_used), used_words):
+        words_strings[i//wpp] += "`" + word + "`, "
+    
+    words_strings = [string[:-2] + "." for string in words_strings]
+    
+    formatter = MySource(words_strings, per_page = 1)
+    menu = MyMenuPages(formatter)
+    await menu.start(ctx)
 
 
 @bot.hybrid_command(name="bank")
@@ -669,54 +686,28 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
         return
 
     await wallet_transfer(ctx.author, "BANK", wager, ctx.channel, 7)
-
-    await ctx.send(
-        f"{ctx.author.mention}, your wager of {wager}$ has been accepted by the bank.  Now rolling the dice..."
-    )
-
+    
+    await ctx.send(f"{ctx.author.mention}, your wager of {wager}$ has been accepted by the bank.  Now rolling the dice...")
+    
     user_money = fetch_wallet_amount(ctx.author.id)
     bank_money = fetch_wallet_amount("BANK")
-
-    all_puzzle = partial(
-        spawn_puzzle,
-        channel=ctx.channel,
-        anarchy_override=True,
-        anarchy_victim=ctx.author,
-    )
-    normal_puzzle = partial(spawn_puzzle, channel=ctx.channel)
-
-    buffed_value = min(math.ceil(wager * 1.5), bank_money - 1)
-    buffed_puzzle = partial(
-        spawn_puzzle, channel=ctx.channel, coin_value=buffed_value, bonus_value=500
-    )
-
-    deflation = partial(
-        force_deflation, channel=ctx.channel, user=ctx.author, amount=math.ceil(wager)
-    )
-    inflation = partial(
-        force_inflation,
-        channel=ctx.channel,
-        user=ctx.author,
-        amount=math.ceil(wager / 2),
-    )
-    dono = min(math.ceil(wager / 2), user_money)
-    bank_donation = partial(
-        donation, channel=ctx.channel, sender=ctx.author, receiver="BANK", amount=dono
-    )
-
-    anarchy = partial(force_anarchy, channel=ctx.channel)
-
-    funcs = [
-        all_puzzle,
-        normal_puzzle,
-        buffed_puzzle,
-        anarchy,
-        deflation,
-        inflation,
-        bank_donation,
-        tax,
-    ]
-
+    
+    all_puzzle = partial(spawn_puzzle, channel = ctx.channel, anarchy_override = True, anarchy_victim = ctx.author)
+    normal_puzzle = partial(spawn_puzzle, channel = ctx.channel)
+    
+    buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
+    buffed_puzzle = partial(spawn_puzzle, channel = ctx.channel, coin_value = buffed_value, bonus_value = 500)
+    
+    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
+    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager/2))
+    dono = min(math.ceil(wager/2), user_money)
+    bank_donation = partial(donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = dono)
+    
+    anarchy = partial(force_anarchy, channel = ctx.channel)
+    taxation = partial(tax, channel = ctx.channel)
+    
+    funcs = [all_puzzle, normal_puzzle, buffed_puzzle, anarchy, deflation, inflation, bank_donation, taxation]
+    
     # Create weights for funcs depending on wager
     if wager < 100:
         weights = (0.05, 0.4, 0.02, 0.03, 0.025, 0.025, 0.4, 0.05)
@@ -734,13 +725,42 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     await selected_fun()
 
 
+@bot.hybrid_command(name="timetrial")
+async def cmd_timetrial(ctx) -> None:
+    """
+    Shows a leaderboard of fastest solves, resets every day.
+    """
+    economy = sqlite3.connect("marketmaker.db")
+    cur = economy.cursor()
+    
+    cur.execute("CREATE TABLE IF NOT EXISTS timeboard(ID INTEGER PRIMARY KEY, time REAL, word TEXT, substr TEXT)")
+
+    cur.execute("""
+    SELECT ID, time, word, substr
+    FROM timeboard
+    ORDER BY time ASC
+    LIMIT 3
+    """)
+    rows = cur.fetchall()
+    if not rows:
+        await ctx.send("Nobody on the leaderboard!")
+        return
+
+    board = ""
+    awards = {0 : "🥇", 1 : "🥈", 2 : "🥉"}
+    for row, i in zip(rows, range(len(rows))):
+        board += f"{awards[i]} {await bot.fetch_user(row[0])} {awards[i]}: {row[1]:.2f} sec, answering `{row[2]}` for `{row[3]}`.\n"
+
+    await ctx.send(board)
+
+
 @bot.hybrid_command(name="force_tax")
 async def cmd_force_tax(ctx) -> None:
     """
     Developer command, forces taxation on all users.
     """
     if dev:
-        await tax()
+        await tax(ctx.channel)
     else:
         await ctx.send("No.")
 

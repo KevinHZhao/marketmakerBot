@@ -1,5 +1,6 @@
 from discord import Message
 
+
 async def fish_react(message: Message) -> None:
     """
     Adds a fish reaction to a message,
@@ -16,4 +17,5 @@ async def fish_react(message: Message) -> None:
     GIF_LINK = "https://tenor.com/view/fish-react-fish-react-him-thanos-gif-26859685"
     for fish in FISH:
         await message.add_reaction(fish)
+
     await message.channel.send(GIF_LINK)

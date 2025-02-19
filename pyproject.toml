@@ -18,10 +18,16 @@ requires-python = ">=3.11"
 readme = "README.md"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-asyncio"]
 
 [project.scripts]
 bot = "marketmaker.bot:run_bot"
 
 [tool.setuptools]
 packages = ["marketmaker"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+markers = ["bot: marks tests as requiring a bot token"]

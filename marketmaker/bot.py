@@ -6,17 +6,17 @@ import math
 import os
 import random
 import sqlite3
+from functools import partial
 from pathlib import Path
-from typing import Literal, Union, Optional
+from typing import Literal, Optional, Union
 
 import discord
 import enchant
 from discord.ext import tasks
 from dotenv import load_dotenv
 from pytz import timezone
-from functools import partial
 
-from marketmaker.backend import used_words_backend, wallet_backend
+from marketmaker.db import fetch_used_words, fetch_wallet_amount
 from marketmaker.initialization import ensure_db, ensure_substr
 from marketmaker.subclass import MarketmakerBot
 
@@ -48,7 +48,9 @@ prefix = "##"
 bot = MarketmakerBot(command_prefix=prefix, intents=intents)
 
 
-def bonus_transfer(receiver: Union[discord.Member, Literal["BANK"]], amount: int, transaction: int = 1) -> None:
+def bonus_transfer(
+    receiver: Union[discord.Member, Literal["BANK"]], amount: int, transaction: int = 1
+) -> None:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
 
@@ -59,8 +61,8 @@ def bonus_transfer(receiver: Union[discord.Member, Literal["BANK"]], amount: int
     else:
         recid = "BANK"
 
-    receiver_cash = wallet_backend(recid)
-    total_cash = wallet_backend("TOTAL")
+    receiver_cash = fetch_wallet_amount(recid)
+    total_cash = fetch_wallet_amount("TOTAL")
 
     cur.execute(
         "UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid)
@@ -68,40 +70,57 @@ def bonus_transfer(receiver: Union[discord.Member, Literal["BANK"]], amount: int
     cur.execute(
         "UPDATE wallets SET cash = ? WHERE ID = ?", (total_cash + amount, "TOTAL")
     )
-    
+
     timestamp = datetime.datetime.now(timezone("US/Eastern"))
-    
+
     cur.execute(
         "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, 'N/A', ?, ?, ?)",
-        (timestamp, recid, amount, transaction)
+        (timestamp, recid, amount, transaction),
     )
 
     economy.commit()
     economy.close()
     print(f"Gave {amount} to {receiver} as a bonus.")
-    
-    
+
+
 async def force_anarchy(channel: discord.TextChannel):
     await channel.send("Anarchy has been forcibly activated!")
     bot.game_vars.anarchy = True
 
 
-async def force_deflation(channel: discord.TextChannel, user: discord.Member, amount: int):
-    await channel.send(f"Deflation!  {amount}$ of {user.mention}'s wagered cash has disappeared from the bank!  The economy shrinks by {amount}$.")
+async def force_deflation(
+    channel: discord.TextChannel, user: discord.Member, amount: int
+):
+    await channel.send(
+        f"Deflation!  {amount}$ of {user.mention}'s wagered cash has disappeared from the bank!  The economy shrinks by {amount}$."
+    )
     bonus_transfer("BANK", -amount, 9)
-    
-    
-async def force_inflation(channel: discord.TextChannel, user: discord.Member, amount: int):
-    await channel.send(f"Inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.")
+
+
+async def force_inflation(
+    channel: discord.TextChannel, user: discord.Member, amount: int
+):
+    await channel.send(
+        f"Inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$."
+    )
     bonus_transfer(user, amount, 8)
 
 
-async def donation(channel:discord.TextChannel, sender: discord.Member, receiver: Union[discord.Member, Literal["BANK"]], amount: int):
+async def donation(
+    channel: discord.TextChannel,
+    sender: discord.Member,
+    receiver: Union[discord.Member, Literal["BANK"]],
+    amount: int,
+):
     if receiver == "BANK":
-        await channel.send(f"{sender.mention} must be feeling generous, since they just donated a further {amount}$ to the bank on top of their initial wager!")
+        await channel.send(
+            f"{sender.mention} must be feeling generous, since they just donated a further {amount}$ to the bank on top of their initial wager!"
+        )
     else:
-        await channel.send(f"{sender.mention} must be feeling generous, since they just donated {amount}$ to {receiver.mention}!")
-    
+        await channel.send(
+            f"{sender.mention} must be feeling generous, since they just donated {amount}$ to {receiver.mention}!"
+        )
+
     await wallet_transfer(sender, receiver, amount, channel, 5)
 
 
@@ -110,7 +129,7 @@ async def wallet_transfer(
     receiver: Union[discord.Member, Literal["BANK"]],
     amount: int,
     channel: discord.TextChannel,
-    transaction: int
+    transaction: int,
 ) -> int:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -121,7 +140,7 @@ async def wallet_transfer(
         raise Exception("receiver is neither discord.Member nor BANK")
     else:
         recid = "BANK"
-        
+
     if isinstance(sender, (discord.User, discord.Member)):
         sendid: Union[Literal["BANK"], int] = sender.id
     elif sender != "BANK":
@@ -129,7 +148,7 @@ async def wallet_transfer(
     else:
         sendid = "BANK"
 
-    sender_cash = wallet_backend(sendid)
+    sender_cash = fetch_wallet_amount(sendid)
 
     if sender_cash < amount:
         if isinstance(sender, (discord.User, discord.Member)):
@@ -152,7 +171,7 @@ async def wallet_transfer(
         cur.execute("UPDATE wallets SET cash = ? WHERE ID = ?", (0, sendid))
 
         economy.commit()
-        receiver_cash = wallet_backend(recid)
+        receiver_cash = fetch_wallet_amount(recid)
 
         cur.execute(
             "UPDATE wallets SET cash = ? WHERE ID = ?",
@@ -165,18 +184,18 @@ async def wallet_transfer(
         )
 
         economy.commit()
-        receiver_cash = wallet_backend(recid)
+        receiver_cash = fetch_wallet_amount(recid)
 
         cur.execute(
             "UPDATE wallets SET cash = ? WHERE ID = ?", (receiver_cash + amount, recid)
         )
         result = amount
-    
+
     timestamp = datetime.datetime.now(timezone("US/Eastern"))
-    
+
     cur.execute(
         "INSERT INTO ledger (time, sender, receiver, amount, type) VALUES (?, ?, ?, ?, ?)",
-        (timestamp, sendid, recid, amount, transaction)
+        (timestamp, sendid, recid, amount, transaction),
     )
 
     economy.commit()
@@ -185,10 +204,16 @@ async def wallet_transfer(
     return result
 
 
-async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] = None, bonus_value: int = 100, anarchy_override: bool = False, anarchy_victim: discord.Member = None) -> None:
-    bank_money = wallet_backend("BANK")
-    total_money = wallet_backend("TOTAL")
-    used_words = used_words_backend()
+async def spawn_puzzle(
+    channel: discord.TextChannel,
+    coin_value: Optional[int] = None,
+    bonus_value: int = 100,
+    anarchy_override: bool = False,
+    anarchy_victim: discord.Member = None,
+) -> None:
+    bank_money = fetch_wallet_amount("BANK")
+    total_money = fetch_wallet_amount("TOTAL")
+    used_words = fetch_used_words()
 
     if bot.game_vars.anarchy:
         bot.game_vars.anarchy = bank_money < total_money / 5
@@ -196,7 +221,7 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
         bot.game_vars.anarchy = bank_money < total_money / 90
 
     root = Path(__file__).parents[1]
-    
+
     normal_min_env = os.getenv("NORMAL_MIN_WORDS")
     if normal_min_env is None:
         raise Exception("No NORMAL_MIN_WORDS provided in .env file.")
@@ -206,16 +231,19 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
         normal_substrings = [line.rstrip("\n") for line in f]
 
     bot.game_vars.seeking_substr = random.choice(normal_substrings)
-    
+
     if anarchy_override:
         assert anarchy_victim is not None
-        victim_money = wallet_backend(anarchy_victim.id)
+        victim_money = fetch_wallet_amount(anarchy_victim.id)
         if victim_money == 0:
-            await channel.send(f"We were going to put all of {anarchy_victim.mention}'s money up for a puzzle, but they don't have any left!  Nothing happens...", delete_after=20)
+            await channel.send(
+                f"We were going to put all of {anarchy_victim.mention}'s money up for a puzzle, but they don't have any left!  Nothing happens...",
+                delete_after=20,
+            )
             return
         bot.game_vars.victim = anarchy_victim
         coin_value = victim_money
-        
+
         announce = await channel.send(
             f"{bot.game_vars.victim.mention}, all {coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
             delete_after=30,
@@ -235,7 +263,7 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
         victim_money = victim_row[1]
         economy.close()
         coin_value = random.randrange(1, math.ceil(victim_money / 4 + 1))
-            
+
         announce = await channel.send(
             f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {bot.game_vars.victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{bot.game_vars.seeking_substr}` within 30 seconds!",
             delete_after=30,
@@ -245,12 +273,12 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
             coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
         if bot.game_vars.daily_counter > 0 and random.randrange(10) == 9:
             print("BONUS TIME")
-            
+
             hard_min_words_env = os.getenv("HARD_MIN_WORDS")
             if hard_min_words_env is None:
                 raise Exception("No HARD_MIN_WORDS provided in .env file.")
             hard_min_words = int(hard_min_words_env)
-            
+
             with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "r") as f:
                 hard_substrings = [line.rstrip("\n") for line in f]
 
@@ -332,12 +360,14 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
                 f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value}$ has been split between the bank and their wallet, out of {bot.game_vars.victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
                 delete_after=10,
             )
-            
+
             assert bot.game_vars.victim is not None
             await wallet_transfer(
                 bot.game_vars.victim, msg.author, math.ceil(coin_value / 2), channel, 3
             )
-            await wallet_transfer(bot.game_vars.victim, "BANK", math.floor(coin_value / 2), channel, 3)
+            await wallet_transfer(
+                bot.game_vars.victim, "BANK", math.floor(coin_value / 2), channel, 3
+            )
     else:
         if bonus:
             await channel.send(
@@ -365,12 +395,12 @@ async def spawn_puzzle(channel: discord.TextChannel, coin_value: Optional[int] =
 async def on_ready() -> None:
     print(f"We have logged in as {bot.user}")
     print(bot.guilds)
-    
+
     time_env = os.getenv("TIMED_SPAWN")
     if time_env is None:
         raise Exception("No TIMED_SPAWN provided in .env file.")
     timed = bool(int(time_env))
-    
+
     if timed:
         timed_puzzle.start()
     tax.start()
@@ -383,11 +413,15 @@ async def on_message(message) -> None:
         return
 
     await bot.process_commands(message)
-    
+
     if message.content.startswith(prefix):
         return
 
-    if random.randrange(100) < prob_coin and bot.game_vars.seeking_substr == "" and message.guild:
+    if (
+        random.randrange(100) < prob_coin
+        and bot.game_vars.seeking_substr == ""
+        and message.guild
+    ):
         await spawn_puzzle(message.channel)
 
 
@@ -396,12 +430,12 @@ async def tax() -> None:
     print("Taxation time!")
 
     bot.game_vars.daily_counter = 3
-    
+
     channel_env = os.getenv("CHANNEL")
     if channel_env is None:
         raise Exception("No CHANNEL provided in .env file.")
     channel = await bot.fetch_channel(int(channel_env))
-        
+
     if not isinstance(channel, discord.TextChannel):
         raise Exception("Provided CHANNEL points to a non-text channel.")
 
@@ -418,7 +452,7 @@ async def tax() -> None:
         user = await bot.fetch_user(userid)
         await wallet_transfer(user, "BANK", math.ceil(0.05 * money), channel, 6)
 
-    bank_money = wallet_backend("BANK")
+    bank_money = fetch_wallet_amount("BANK")
 
     await channel.send(
         f"Taxation time!  The value of the bank is now {bank_money}$.  Good work everyone!"
@@ -432,10 +466,10 @@ async def timed_puzzle() -> None:
         if channel_env is None:
             raise Exception("No CHANNEL provided in .env file.")
         channel = await bot.fetch_channel(int(channel_env))
-        
+
         if not isinstance(channel, discord.TextChannel):
             raise Exception("Provided CHANNEL points to a non-text channel.")
-        
+
         await spawn_puzzle(channel)
 
 
@@ -446,7 +480,7 @@ async def cmd_wallet(ctx, target: discord.Member = None) -> None:
     """
     if target is None:
         target = ctx.author
-    money = wallet_backend(target.id)
+    money = fetch_wallet_amount(target.id)
     await ctx.send(f"{target} has {money}$ in their wallet!")
 
 
@@ -455,7 +489,7 @@ async def cmd_used(ctx) -> None:
     """
     Displays all previously used words in the game.
     """
-    used_words = used_words_backend()
+    used_words = fetch_used_words()
 
     words_string = ""
     for word in used_words:
@@ -469,8 +503,8 @@ async def cmd_bank(ctx) -> None:
     """
     Displays the current money in the bank and the total money in the economy.
     """
-    bank_money = wallet_backend("BANK")
-    total_money = wallet_backend("TOTAL")
+    bank_money = fetch_wallet_amount("BANK")
+    total_money = fetch_wallet_amount("TOTAL")
     await ctx.send(
         f"The bank currently has {bank_money}$, out of a total of {total_money}$ in the economy!"
     )
@@ -528,7 +562,7 @@ async def cmd_leaderboard(ctx) -> None:
         board += f"{i}. {await bot.fetch_user(row[0])}: {row[1]}$\n"
 
     await ctx.send(board)
-    
+
 
 @bot.hybrid_command(name="ledger")
 async def cmd_ledger(ctx, target: discord.Member = None) -> None:
@@ -541,20 +575,24 @@ async def cmd_ledger(ctx, target: discord.Member = None) -> None:
         raise Exception("target is neither discord.User nor None!")
     else:
         targetid = "BANK"
-        await ctx.send("No user given, showing ten most recent transactions...", delete_after = 10)
-    
+        await ctx.send(
+            "No user given, showing ten most recent transactions...", delete_after=10
+        )
+
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
-    
-    cur.execute("""
+
+    cur.execute(
+        """
     SELECT time, sender, receiver, amount, type
     FROM ledger
     WHERE sender IN (?) OR receiver IN (?)
     ORDER BY time DESC
     LIMIT 10
     """,
-    (targetid, targetid))
-    
+        (targetid, targetid),
+    )
+
     rows = cur.fetchall()
     if not rows:
         await ctx.send("User has no transactions!")
@@ -562,20 +600,20 @@ async def cmd_ledger(ctx, target: discord.Member = None) -> None:
 
     ledger = ""
     transaction_dict = {
-        1 : " for solving a bonus puzzle!", # bonus puzzle
-        2 : " for solving a puzzle.", # puzzle
-        3 : ", who was a victim of an anarchy puzzle.", # anarchy puzzle
-        4 : " due to unethical behaviour.", # cheat
-        5 : " as a donation.", # send/donate
-        6 : " as taxes.", # tax
-        7 : " as a wager.", # random
-        8 : " as a bonus.", # force_inflation
-        9 : " due to deflation." # force_deflataion
+        1: " for solving a bonus puzzle!",  # bonus puzzle
+        2: " for solving a puzzle.",  # puzzle
+        3: ", who was a victim of an anarchy puzzle.",  # anarchy puzzle
+        4: " due to unethical behaviour.",  # cheat
+        5: " as a donation.",  # send/donate
+        6: " as taxes.",  # tax
+        7: " as a wager.",  # random
+        8: " as a bonus.",  # force_inflation
+        9: " due to deflation.",  # force_deflataion
     }
-    
+
     for row in rows:
         timestamp = row[0].split(".")[0]
-        
+
         sendid = row[1]
         if sendid == "BANK":
             sender: Union[Literal["the bank"], discord.Member, None] = "the bank"
@@ -583,16 +621,16 @@ async def cmd_ledger(ctx, target: discord.Member = None) -> None:
             sender = None
         else:
             sender = await bot.fetch_user(int(sendid))
-            
+
         recid = row[2]
         if recid == "BANK":
             receiver: Union[Literal["The bank"], discord.Member] = "The bank"
         else:
             receiver = await bot.fetch_user(int(recid))
-            
+
         amount = row[3]
         transaction = row[4]
-        
+
         if transaction in [1, 8]:
             ledger += f"[{timestamp}] {receiver} received {amount}${transaction_dict[transaction]}\n"
         elif transaction == 9:
@@ -601,7 +639,7 @@ async def cmd_ledger(ctx, target: discord.Member = None) -> None:
             ledger += f"[{timestamp}] {receiver} received {amount}$ from {sender}{transaction_dict[transaction]}\n"
 
     economy.close()
-    
+
     await ctx.send(ledger)
 
 
@@ -611,41 +649,74 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
     Causes a random event to occur, requires a wager rom the user.
     """
     if wager <= 0:
-        await ctx.send(f"{ctx.author.mention}, you must provide a positive integer wager!")
+        await ctx.send(
+            f"{ctx.author.mention}, you must provide a positive integer wager!"
+        )
         return
-    
+
     if bot.game_vars.seeking_substr != "":
-        await ctx.send(f"{ctx.author.mention}, wait for the current puzzle to end before using this command!")
+        await ctx.send(
+            f"{ctx.author.mention}, wait for the current puzzle to end before using this command!"
+        )
         return
-    
-    user_money = wallet_backend(ctx.author.id)
+
+    user_money = fetch_wallet_amount(ctx.author.id)
     assert isinstance(wager, int)
     if wager > user_money:
-        await ctx.send(f"{ctx.author.mention}, you don't have enough money for that wager!")
+        await ctx.send(
+            f"{ctx.author.mention}, you don't have enough money for that wager!"
+        )
         return
-    
+
     await wallet_transfer(ctx.author, "BANK", wager, ctx.channel, 7)
-    
-    await ctx.send(f"{ctx.author.mention}, your wager of {wager}$ has been accepted by the bank.  Now rolling the dice...")
-    
-    user_money = wallet_backend(ctx.author.id)
-    bank_money = wallet_backend("BANK")
-    
-    all_puzzle = partial(spawn_puzzle, channel = ctx.channel, anarchy_override = True, anarchy_victim = ctx.author)
-    normal_puzzle = partial(spawn_puzzle, channel = ctx.channel)
-    
-    buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
-    buffed_puzzle = partial(spawn_puzzle, channel = ctx.channel, coin_value = buffed_value, bonus_value = 500)
-    
-    deflation = partial(force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
-    inflation = partial(force_inflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager/2))
-    dono = min(math.ceil(wager/2), user_money)
-    bank_donation = partial(donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = dono)
-    
-    anarchy = partial(force_anarchy, channel = ctx.channel)
-    
-    funcs = [all_puzzle, normal_puzzle, buffed_puzzle, anarchy, deflation, inflation, bank_donation, tax]
-    
+
+    await ctx.send(
+        f"{ctx.author.mention}, your wager of {wager}$ has been accepted by the bank.  Now rolling the dice..."
+    )
+
+    user_money = fetch_wallet_amount(ctx.author.id)
+    bank_money = fetch_wallet_amount("BANK")
+
+    all_puzzle = partial(
+        spawn_puzzle,
+        channel=ctx.channel,
+        anarchy_override=True,
+        anarchy_victim=ctx.author,
+    )
+    normal_puzzle = partial(spawn_puzzle, channel=ctx.channel)
+
+    buffed_value = min(math.ceil(wager * 1.5), bank_money - 1)
+    buffed_puzzle = partial(
+        spawn_puzzle, channel=ctx.channel, coin_value=buffed_value, bonus_value=500
+    )
+
+    deflation = partial(
+        force_deflation, channel=ctx.channel, user=ctx.author, amount=math.ceil(wager)
+    )
+    inflation = partial(
+        force_inflation,
+        channel=ctx.channel,
+        user=ctx.author,
+        amount=math.ceil(wager / 2),
+    )
+    dono = min(math.ceil(wager / 2), user_money)
+    bank_donation = partial(
+        donation, channel=ctx.channel, sender=ctx.author, receiver="BANK", amount=dono
+    )
+
+    anarchy = partial(force_anarchy, channel=ctx.channel)
+
+    funcs = [
+        all_puzzle,
+        normal_puzzle,
+        buffed_puzzle,
+        anarchy,
+        deflation,
+        inflation,
+        bank_donation,
+        tax,
+    ]
+
     # Create weights for funcs depending on wager
     if wager < 100:
         weights = (0.05, 0.4, 0.02, 0.03, 0.025, 0.025, 0.4, 0.05)
@@ -657,15 +728,10 @@ async def cmd_random_event(ctx, wager: Optional[int] = None) -> None:
         weights = (0.02, 0.1, 0.5, 0.07, 0.08, 0.08, 0.13, 0.02)
     else:
         weights = (0.01, 0, 0.6, 0.13, 0.13, 0.13, 0, 0)
-    
-    selected_fun = random.choices(
-        funcs,
-        weights = weights,
-        k = 1
-    )[0]
-    
+
+    selected_fun = random.choices(funcs, weights=weights, k=1)[0]
+
     await selected_fun()
-    
 
 
 @bot.hybrid_command(name="force_tax")
@@ -685,7 +751,7 @@ async def cmd_cheat(ctx) -> None:
     Developer command, steals 99% of the bank's money and deposits it in user's wallet.
     """
     if dev:
-        bank_money = wallet_backend("BANK")
+        bank_money = fetch_wallet_amount("BANK")
         await wallet_transfer(
             "BANK", ctx.author, math.ceil(0.99 * bank_money), ctx.channel, 4
         )

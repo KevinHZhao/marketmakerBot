@@ -1,11 +1,9 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
-import sqlite3
-import os
 
-from marketmaker.initialization import ensure_db, STARTING_MONEY, num_member_words
-from nltk.corpus import words
+from marketmaker.initialization import STARTING_MONEY, ensure_db
 
 
 def test_database_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -29,13 +27,13 @@ def test_database_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert not (tmp_path / "marketmaker.db").exists()
     ensure_db()
     assert (tmp_path / "marketmaker.db").exists()
-    
+
     economy = sqlite3.connect(tmp_path / "marketmaker.db")
     cur = economy.cursor()
-    
+
     cur.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     tables = [name[0] for name in cur.fetchall()]
-    
+
     assert "wallets" in tables
     assert "used_words" in tables
     assert "ledger" in tables
@@ -43,9 +41,9 @@ def test_database_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     cur.execute("SELECT cash FROM wallets WHERE ID = 'BANK'")
     bank_money = cur.fetchone()[0]
     assert bank_money == STARTING_MONEY
-    
+
     cur.execute("SELECT cash FROM wallets WHERE ID = 'TOTAL'")
     total_money = cur.fetchone()[0]
     assert total_money == STARTING_MONEY
-    
+
     economy.close()

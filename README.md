@@ -28,6 +28,7 @@ CHANNEL=... # discord channel id of the channel bot should default announcements
 NORMAL_MIN_WORDS=... # minimum number of words you'd like to be possible for each substring in a normal puzzle (ex 250)
 HARD_MIN_WORDS=... # minimum number of words you'd like to be possible for each substring in a hard puzzle (ex 100)
 AUTHOR=... # discord user id of the bot's author (may not be necessary)
+TEST_GUILD_ID=... # ID of testing server
 ```
 
 ## Running the Bot
@@ -37,7 +38,9 @@ AUTHOR=... # discord user id of the bot's author (may not be necessary)
 
 ## Running Test Suite
 
-Run `pytest`.
+Run `pytest`. This will run all tests except those requiring the bot to log into Discord.
+
+Run `pytest --run-bot` to include integration tests. Note that this requires an internet collection, valid token, and testing server.
 
 ## Project Layout
 

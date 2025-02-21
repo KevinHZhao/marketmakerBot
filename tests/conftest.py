@@ -7,6 +7,8 @@ from discord import Guild, Intents
 from discord.client import _LoopSentinel
 from dotenv import load_dotenv
 
+import marketmaker.actions
+import marketmaker.cmnds
 from marketmaker.subclass import MarketmakerBot
 
 
@@ -47,6 +49,12 @@ async def bot():
     intents = Intents.default()
     intents.message_content = True
     bot = MarketmakerBot(command_prefix="##", intents=intents)
+
+    for c in marketmaker.cmnds.cogs:
+        await bot.add_cog(c(bot))
+
+    for c in marketmaker.actions.cogs:
+        await bot.add_cog(c(bot))
 
     # Log in & start bot without blocking
     await bot.login(os.getenv("BOT_TOKEN"))

@@ -34,4 +34,3 @@ class MySource(menus.ListPageSource):
         )
         embed.set_footer(text=f"Requested by {menu.ctx.author}")
         return embed
-    

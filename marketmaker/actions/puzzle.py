@@ -68,7 +68,6 @@ class Puzzle(commands.Cog):
         }
 
         announce = await channel.send(spawn_msgs[outcome], delete_after=30)
-
         results = await self.test_puzzle(channel, game_vars)
 
         if results is None:
@@ -94,7 +93,7 @@ class Puzzle(commands.Cog):
                 victim,
             )
 
-        return 
+        return
 
     async def test_puzzle(
         self,

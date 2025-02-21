@@ -17,7 +17,6 @@ def test_database_bootstrap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch : pytest.MonkeyPatch
         A pytest fixture that allows for monkeypatching.
     """
-
     # monkeypatch DB_PATH to point to tmp_path/marketmaker.db (test directory)
     monkeypatch.setattr(
         "marketmaker.initialization.DB_PATH", tmp_path / "marketmaker.db"

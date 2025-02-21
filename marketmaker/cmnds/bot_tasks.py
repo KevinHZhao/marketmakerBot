@@ -36,7 +36,7 @@ class BotTasks(commands.Cog):
     @tasks.loop(seconds=random.randint(60, 600))
     async def timed_puzzle(self: BotTasks, game_vars: GameVars) -> None:
         if game_vars.seeking_substr == "":
-            channel = await self.bot.fetch_channel(int(self.bot.channelid))
+            channel = await self.bot.fetch_channel(int(float(self.bot.channelid)))
 
             if not isinstance(channel, discord.TextChannel):
                 raise Exception("Provided CHANNEL points to a non-text channel.")

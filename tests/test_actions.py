@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import asyncio
+from typing import TYPE_CHECKING
 
 import pytest
-from discord import TextChannel
 
-from marketmaker.actions import fish_react
+if TYPE_CHECKING:
+    from discord import TextChannel
+
+    from marketmaker.subclass import MarketmakerBot
 
 
 @pytest.mark.bot
-async def test_fish_react(channel: TextChannel, event_loop):
+async def test_fish_react(bot: MarketmakerBot, channel: TextChannel, event_loop):
     # send a base message
 
     loop = asyncio.get_running_loop()
@@ -15,7 +20,8 @@ async def test_fish_react(channel: TextChannel, event_loop):
     message = await channel.send("Test message")
 
     # call the function
-    await fish_react(message)
+    funf = bot.get_cog("Fun")
+    await funf.fish_react(message)
 
     # check if the message has the fish reaction; re-fetch
     FISH = ["🐟", "🐠", "🐡", "🎣", "🦈"]

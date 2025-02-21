@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 import marketmaker.actions
 import marketmaker.cmnds
-from marketmaker.initialization import ensure_substr
+from marketmaker.initialization import ensure_db, ensure_substr
 from marketmaker.subclass import MarketmakerBot
 
 
@@ -52,6 +52,7 @@ async def bot():
     bot = MarketmakerBot(command_prefix="##", intents=intents)
 
     ensure_substr(bot.normal_min_words, bot.hard_min_words)
+    ensure_db()
 
     for c in marketmaker.cmnds.cogs:
         await bot.add_cog(c(bot))

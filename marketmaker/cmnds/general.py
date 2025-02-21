@@ -99,8 +99,12 @@ class General(commands.Cog):
         Displays a leaderboard of up to ten users based on their current wallet.
         """
         lb = self.bot.get_cog("Leaderboard")
-        board = lb.build_leaderboard(ctx.channel)
-        await ctx.send(board)
+        board = await lb.build_leaderboard()
+        print(board)
+        if board is None:
+            await ctx.channel.send("Nobody on the leaderboard!")
+        else:
+            await ctx.send(board)
 
 
     @commands.hybrid_command(name="ledger")

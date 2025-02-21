@@ -27,10 +27,10 @@ class BotTasks(commands.Cog):
         channel: discord.TextChannel = await self.bot.fetch_channel(int(self.bot.channelid))
 
         eco = self.bot.get_cog("Economy")
-        eco.tax(channel)
+        await eco.tax(channel)
 
         lb = self.bot.get_cog("Leaderboard")
-        lb.reset_timer_board(channel)
+        await lb.reset_timer_board(channel)
 
 
     @tasks.loop(seconds=random.randint(60, 600))

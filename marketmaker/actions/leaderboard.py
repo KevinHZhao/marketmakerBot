@@ -17,17 +17,19 @@ class Leaderboard(commands.Cog):
     def __init__(self: Leaderboard, bot) -> None:
         self.bot = bot
 
+
     async def reset_timer_board(self: Leaderboard, channel: discord.TextChannel) -> None:
         reset_timer_board_backend()
         await channel.send("The time trial leaderboard has been reset!")
 
 
-    async def build_leaderboard(self: Leaderboard, channel: discord.TextChannel) -> None:
+    async def build_leaderboard(self: Leaderboard) -> None | str:
         rows = leaderboard_backend()
-        if not rows:
-            await channel.send("Nobody on the leaderboard!")
-            return
+        if rows is None:
+            return None
 
         board = ""
         for row, i in zip(rows, range(len(rows)), strict=False):
-            board += f"{i}. {await self.bot.fetch_user(row[0])}: {row[1]}$\n"
+            board += f"{i + 1}. {await self.bot.fetch_user(row[0])}: {row[1]}$\n"
+
+        return board

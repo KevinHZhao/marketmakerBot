@@ -66,8 +66,14 @@ async def bot():
     await bot.wait_until_ready()
     yield bot
 
+
+    # Cancel all pending tasks
+    pending = asyncio.all_tasks(loop=bot.loop)
+    for task in pending:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
     # Teardown
-    bot_task.cancel()
     try:
         await bot.close()
         await bot_task

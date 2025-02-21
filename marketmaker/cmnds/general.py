@@ -8,7 +8,7 @@ from typing import Literal, Optional
 import discord
 from discord.ext import commands
 
-from marketmaker.lib.db import (
+from marketmaker.backend.db import (
     build_ledger,
     build_timetrial,
     fetch_used_words,

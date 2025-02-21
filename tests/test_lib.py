@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from marketmaker.lib.bomb_party import setup_bomb
+from marketmaker.backend.bomb_party import setup_bomb
 
 if TYPE_CHECKING:
     from marketmaker.subclass import MarketmakerBot

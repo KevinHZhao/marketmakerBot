@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
-from marketmaker.lib.db import (
+from marketmaker.backend.db import (
     leaderboard_backend,
     reset_timer_board_backend,
 )

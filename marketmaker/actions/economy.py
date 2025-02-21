@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal
 import discord
 from discord.ext import commands
 
-from marketmaker.lib.db import (
+from marketmaker.backend.db import (
     bonus_transfer,
     fetch_wallet_amount,
     tax_backend,

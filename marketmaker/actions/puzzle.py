@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Optional
 
 from discord.ext import commands
 
-from marketmaker.lib.bomb_party import check_bomb, finish_bomb, setup_bomb
-from marketmaker.lib.db import (
+from marketmaker.backend.bomb_party import check_bomb, finish_bomb, setup_bomb
+from marketmaker.backend.db import (
     add_used_word,
     fetch_used_words,
     fetch_wallet_amount,

@@ -11,6 +11,12 @@ on:
 env:
   BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
   TEST_GUILD_ID: ${{ secrets.TEST_GUILD_ID }}
+  PROB: 100
+  DEV_MODE: 1
+  TIMED_SPAWN: 1
+  CHANNEL: 709954286947270688
+  NORMAL_MIN_WORDS: 250
+  HARD_MIN_WORDS: 100
 
 jobs:
   build:

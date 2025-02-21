@@ -78,13 +78,13 @@ def ensure_substr(normal_min_words: int, hard_min_words: int) -> None:
     if not require_create:
         print("Substring lists are up to date.")
         return
-    
+
     substrings = ["".join(i) for i in product(ascii_lowercase, repeat=2)] + [
         "".join(i) for i in product(ascii_lowercase, repeat=3)
     ]
     if not count_fpath.is_file():
         generate_counts(substrings, count_fpath)
-        
+
     substr_counts: list[int] = np.loadtxt(count_fpath, dtype = int).tolist()
 
     create_substr(substr_counts, substrings, normal_fpath, "medium", normal_min_words)

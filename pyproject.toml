@@ -32,3 +32,18 @@ filterwarnings = ["ignore::DeprecationWarning"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 markers = ["bot: marks tests as requiring a bot token"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "RET504",
+    "D100",
+    "D205",
+    "D401",
+    "D212",
+    "N806",
+    "PLR2004",
+    "S101",
+    "INP001",
+    "PD008",
+]

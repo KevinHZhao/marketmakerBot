@@ -7,7 +7,6 @@ from multiprocessing import Pool
 from pathlib import Path
 from string import ascii_lowercase
 
-from dotenv import load_dotenv
 from nltk.corpus import words
 
 STARTING_MONEY = 100000
@@ -66,21 +65,9 @@ def generate_counts(substrings: list[str], fpath: Path) -> None:
     np.savetxt(fpath, substr_counts, fmt="%s")
 
 
-def ensure_substr() -> None:
+def ensure_substr(normal_min_words: int, hard_min_words: int) -> None:
     """Ensures that substring lists are initialized."""
-    load_dotenv(override = True)
-
     static_dir = Path(__file__).parents[1] / "static"
-
-    normal_min_env = os.getenv("NORMAL_MIN_WORDS")
-    if normal_min_env is None:
-        raise Exception("No NORMAL_MIN_WORDS provided in .env file.")
-    normal_min_words = int(normal_min_env)
-    
-    hard_min_words_env = os.getenv("HARD_MIN_WORDS")
-    if hard_min_words_env is None:
-        raise Exception("No HARD_MIN_WORDS provided in .env file.")
-    hard_min_words = int(hard_min_words_env)
 
     # Check if we need to create the lists
     count_fpath = static_dir / "counts_substr.txt"

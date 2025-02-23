@@ -68,7 +68,7 @@ class Puzzle(commands.Cog):
         }
 
         announce = await channel.send(spawn_msgs[outcome], delete_after=30)
-        results = await self.test_puzzle(channel, game_vars)
+        results = await self.test_puzzle(channel, game_vars, announce)
 
         if results is None:
             await self.failed_answer(game_vars, channel, coin_value)
@@ -99,6 +99,7 @@ class Puzzle(commands.Cog):
         self,
         channel: discord.TextChannel,
         game_vars: GameVars,
+        announce: discord.Message,
     ) -> tuple[discord.Message, float] | None:
         def check(m: discord.Message) -> bool:
             if not m.content:
@@ -111,8 +112,8 @@ class Puzzle(commands.Cog):
 
         used_words = fetch_used_words()
 
-        start_time = datetime.datetime.now()
-        TIME_LIMIT_SEC = 30
+        start_time = announce.created_at
+        TIME_LIMIT_SEC = 30.0
         elapsed_time = 0.0
         try:
             # Keep listening for messages until 30 seconds have passed or a 👍 reaction is given
@@ -121,7 +122,7 @@ class Puzzle(commands.Cog):
                     # Wait for a message (1 second timeout for each check)
                     msg = await self.bot.wait_for("message", check=check, timeout=1.0)
 
-                    elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
+                    elapsed_time = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
 
                     # If the message is in used_words, react with ❌ and continue checking
                     if msg.content.lower() in used_words:
@@ -130,7 +131,7 @@ class Puzzle(commands.Cog):
                         break  # End the game when a valid message is found
 
                 except asyncio.TimeoutError:
-                    elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
+                    elapsed_time = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
                     continue  # If no new message, continue the loop
 
             if elapsed_time >= TIME_LIMIT_SEC:
@@ -147,8 +148,8 @@ class Puzzle(commands.Cog):
         channel: discord.TextChannel,
         coin_value: int,
     ) -> None:
-        victim = await self.bot.fetch_user(game_vars.victimid)
         if game_vars.anarchy:
+            victim = await self.bot.fetch_user(game_vars.victimid)
             await channel.send(
                 f"Time's up!  No one claimed the :coin: Coins :coin: so {victim}'s {coin_value}$ are going to the bank!",
                 delete_after=10,
@@ -156,7 +157,6 @@ class Puzzle(commands.Cog):
             assert game_vars.victimid is not None
             assert isinstance(coin_value, int)
             eco = self.bot.get_cog("Economy")
-            victim = await self.bot.fetch_user(game_vars.victimid)
             await eco.wallet_transfer(victim, "BANK", coin_value, channel, 3)
         else:
             await channel.send(

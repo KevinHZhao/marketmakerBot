@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 from functools import partial
-from typing import Literal, Optional
+from typing import Literal
 
 import discord
 from discord.ext import commands
@@ -61,7 +61,7 @@ class General(commands.Cog):
         bank_money = fetch_wallet_amount("BANK")
         total_money = fetch_wallet_amount("TOTAL")
         await ctx.send(
-            f"The bank currently has {bank_money}$, out of a total of {total_money}$ in the economy!"
+            f"The bank currently has {bank_money}$, out of a total of {total_money}$ in the economy!",
         )
 
 
@@ -75,17 +75,17 @@ class General(commands.Cog):
             if int(amount) > 0:
                 if receiver.bot:
                     result = await eco.wallet_transfer(
-                        ctx.author, "BANK", int(amount), ctx.channel, 5
+                        ctx.author, "BANK", int(amount), ctx.channel, 5,
                     )
                     await ctx.send(
-                        f"{ctx.author.mention}, you're only supposed to use this command with non-bots...  Don't worry, we know you want to be generous, so your {result}$ has been sent to the bank!"
+                        f"{ctx.author.mention}, you're only supposed to use this command with non-bots...  Don't worry, we know you want to be generous, so your {result}$ has been sent to the bank!",
                     )
                 else:
                     result = await eco.wallet_transfer(
-                        ctx.author, receiver, int(amount), ctx.channel, 5
+                        ctx.author, receiver, int(amount), ctx.channel, 5,
                     )
                     await ctx.send(
-                        f"{receiver.mention}, {ctx.author.mention} has graciously sent you {result}$!"
+                        f"{receiver.mention}, {ctx.author.mention} has graciously sent you {result}$!",
                     )
             else:
                 await ctx.send("Error, please enter a positive, integer amount.")
@@ -112,7 +112,6 @@ class General(commands.Cog):
         """
         Displays a ledger of the ten most recent transactions from an individual
         """
-
         if isinstance(target, discord.User | discord.Member):
             targetid: Literal["BANK"] | int = target.id
         elif target is not None:
@@ -120,7 +119,7 @@ class General(commands.Cog):
         else:
             targetid = "BANK"
             await ctx.send(
-                "No user given, showing ten most recent transactions...", delete_after=10
+                "No user given, showing ten most recent transactions...", delete_after=10,
             )
 
         rows = build_ledger(targetid)
@@ -173,27 +172,28 @@ class General(commands.Cog):
 
 
     @commands.hybrid_command(name="random")
-    async def cmd_random_event(self: General, ctx, wager: Optional[int] = None) -> None:
+    async def cmd_random_event(self: General, ctx, wager: int | None = None) -> None:
         """
         Causes a random event to occur, requires a wager rom the user.
         """
         if wager <= 0:
             await ctx.send(
-                f"{ctx.author.mention}, you must provide a positive integer wager!"
+                f"{ctx.author.mention}, you must provide a positive integer wager!",
             )
             return
 
-        if self.bot.game_vars.seeking_substr != "":
-            await ctx.send(
-                f"{ctx.author.mention}, wait for the current puzzle to end before using this command!"
-            )
-            return
-
+        puzzle = self.bot.get_cog("Puzzle")
         user_money = fetch_wallet_amount(ctx.author.id)
+        if puzzle.is_puzzle_running() and user_money >= 100:
+            await ctx.send(
+                f"{ctx.author.mention}, you're too rich to need to spam this command!",
+            )
+            return
+
         assert isinstance(wager, int)
         if wager > user_money:
             await ctx.send(
-                f"{ctx.author.mention}, you don't have enough money for that wager!"
+                f"{ctx.author.mention}, you don't have enough money for that wager!",
             )
             return
 
@@ -205,7 +205,6 @@ class General(commands.Cog):
         user_money = fetch_wallet_amount(ctx.author.id)
         bank_money = fetch_wallet_amount("BANK")
 
-        puzzle = self.bot.get_cog("Puzzle")
         all_puzzle = partial(puzzle.spawn_puzzle, channel = ctx.channel, game_vars = self.bot.game_vars, anarchy_override = True, anarchy_victim = ctx.author)
         normal_puzzle = partial(puzzle.spawn_puzzle, channel = ctx.channel, game_vars = self.bot.game_vars)
 
@@ -256,7 +255,7 @@ class General(commands.Cog):
 
         board = ""
         awards = {0 : "🥇", 1 : "🥈", 2 : "🥉"}
-        for row, i in zip(rows, range(len(rows))):
+        for row, i in zip(rows, range(len(rows)), strict=False):
             board += f"{awards[i]} {await self.bot.fetch_user(row[0])} {awards[i]}: {row[1]:.2f} sec, answering `{row[2]}` for `{row[3]}`.\n"
 
         await ctx.send(board)
@@ -287,5 +286,5 @@ class General(commands.Cog):
         else:
             result = await eco.wallet_transfer(ctx.author, "BANK", 5, ctx.channel, 4)
             await ctx.send(
-                f"{ctx.author.mention}, you have successfully donated {result}$ to the bank, good job!"
+                f"{ctx.author.mention}, you have successfully donated {result}$ to the bank, good job!",
             )

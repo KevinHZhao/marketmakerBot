@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import random
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
@@ -24,76 +24,92 @@ if TYPE_CHECKING:
 class Puzzle(commands.Cog):
     def __init__(self: Puzzle, bot) -> None:
         self.bot = bot
+        self.lock = asyncio.Lock()
+
+
+    def is_puzzle_running(self:Puzzle) -> bool:
+        return self.lock.locked()
 
 
     async def spawn_puzzle(
         self: Puzzle,
         channel: discord.TextChannel,
         game_vars: GameVars,
-        coin_value: Optional[int] = None,
+        coin_value: int | None = None,
         bonus_value: int = 100,
         anarchy_override: bool = False,
         anarchy_victim: discord.Member = None,
     ) -> None:
-        bank_money = fetch_wallet_amount("BANK")
-        total_money = fetch_wallet_amount("TOTAL")
-
-        if game_vars.anarchy:
-            game_vars.anarchy = bank_money < total_money / 5
-        else:
-            game_vars.anarchy = bank_money < total_money / 90
-
-        if anarchy_override and fetch_wallet_amount(anarchy_victim.id) == 0:
-            await channel.send(
-                f"We were going to put all of {anarchy_victim.mention}'s money up for a puzzle, but they don't have any left!  Nothing happens..."
-            )
+        if self.lock.locked():
+            await channel.send("Error: Somehow tried to spawn a puzzle while one was already active.  Please report this to the bot owner.")
             return
 
-        bonus = game_vars.daily_counter > 0 and random.randrange(10) == 9
-        coin_value, outcome = setup_bomb(game_vars, bonus, self.bot.normal_min_words, self.bot.hard_min_words, coin_value, anarchy_override, anarchy_victim)
+        async with self.lock:
+            bank_money = fetch_wallet_amount("BANK")
+            total_money = fetch_wallet_amount("TOTAL")
 
-        if game_vars.victimid is None:
-            # This is a failsafe, but it should never be reached
-            victim = "ERROR NO VICTIM"
-            vicmen = "ERROR NO VICTIM"
-        else:
-            victim = await self.bot.fetch_user(game_vars.victimid)
-            vicmen = victim.mention
+            if game_vars.anarchy:
+                game_vars.anarchy = bank_money < total_money / 5
+            else:
+                game_vars.anarchy = bank_money < total_money / 90
 
-        spawn_msgs = {
-            1: f"{vicmen}, all {coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-            2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-            3: f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + bonus_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-            4: f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-        }
+            if anarchy_override and fetch_wallet_amount(anarchy_victim.id) == 0:
+                await channel.send(
+                    f"We were going to put all of {anarchy_victim.mention}'s money up for a puzzle, but they don't have any left!  Nothing happens...",
+                )
+                return
 
-        announce = await channel.send(spawn_msgs[outcome], delete_after=30)
-        results = await self.test_puzzle(channel, game_vars, announce)
+            bonus = game_vars.daily_counter > 0 and random.randrange(10) == 9
+            coin_value, outcome = setup_bomb(game_vars, bonus, self.bot.normal_min_words, self.bot.hard_min_words, coin_value, anarchy_override, anarchy_victim)
 
-        if results is None:
-            await self.failed_answer(game_vars, channel, coin_value)
-        else:
-            answer, elapsed_time = results
+            if game_vars.victimid is None:
+                # This is a failsafe, but it should never be reached
+                victim = "ERROR NO VICTIM"
+                vicmen = "ERROR NO VICTIM"
+            else:
+                if anarchy_override:
+                    victim = anarchy_victim
+                    game_vars.victimid = anarchy_victim.id
+                else:
+                    victim = await self.bot.fetch_user(game_vars.victimid)
 
-            if round(elapsed_time % 10, 2) == 7.27:
-                extra_bonus = round(bonus_value * 7.27)
-                bonus_value = bonus_value * bonus + extra_bonus
-                bonus = True
-                await channel.send(f"WYSI buff applied, extra bonus applied to this puzzle of {extra_bonus}$.")
-            await self.complete_puzzle(
-                announce,
-                channel,
-                game_vars,
-                coin_value,
-                bonus_value,
-                answer,
-                elapsed_time,
-                bonus,
-                anarchy_override,
-                victim,
-            )
+                game_vars.anarchy = True
+                vicmen = victim.mention
 
-        return
+            spawn_msgs = {
+                1: f"{vicmen}, all {coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+                2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+                3: f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + bonus_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+                4: f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+            }
+
+            announce = await channel.send(spawn_msgs[outcome], delete_after=30)
+            results = await self.test_puzzle(channel, game_vars, announce)
+
+            if results is None:
+                await self.failed_answer(game_vars, channel, coin_value)
+            else:
+                answer, elapsed_time = results
+
+                if round(elapsed_time % 10, 2) == 7.27:
+                    extra_bonus = round(bonus_value * 7.27)
+                    bonus_value = bonus_value * bonus + extra_bonus
+                    bonus = True
+                    await channel.send(f"WYSI buff applied, extra bonus applied to this puzzle of {extra_bonus}$.")
+                await self.complete_puzzle(
+                    announce,
+                    channel,
+                    game_vars,
+                    coin_value,
+                    bonus_value,
+                    answer,
+                    elapsed_time,
+                    bonus,
+                    anarchy_override,
+                    victim,
+                )
+
+            return
 
     async def test_puzzle(
         self,
@@ -130,13 +146,13 @@ class Puzzle(commands.Cog):
                     else:
                         break  # End the game when a valid message is found
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     elapsed_time = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
                     continue  # If no new message, continue the loop
 
             if elapsed_time >= TIME_LIMIT_SEC:
-                raise asyncio.TimeoutError()
-        except asyncio.TimeoutError:
+                raise TimeoutError
+        except TimeoutError:
             return None
 
         return (msg, elapsed_time)
@@ -149,15 +165,16 @@ class Puzzle(commands.Cog):
         coin_value: int,
     ) -> None:
         if game_vars.anarchy:
+            assert game_vars.victimid is not None
             victim = await self.bot.fetch_user(game_vars.victimid)
             await channel.send(
                 f"Time's up!  No one claimed the :coin: Coins :coin: so {victim}'s {coin_value}$ are going to the bank!",
                 delete_after=10,
             )
-            assert game_vars.victimid is not None
-            assert isinstance(coin_value, int)
             eco = self.bot.get_cog("Economy")
             await eco.wallet_transfer(victim, "BANK", coin_value, channel, 3)
+            game_vars.victimid = None
+            game_vars.anarchy = False
         else:
             await channel.send(
                 "Time's up!  No one claimed the :coin: Coins :coin: so they've been returned to the bank...",
@@ -195,3 +212,5 @@ class Puzzle(commands.Cog):
         timer_board_add(msg.author.id, elapsed_time, msg.content.lower(), game_vars.seeking_substr)
         add_used_word(msg.content.lower())
         game_vars.seeking_substr = ""
+        game_vars.victimid = None
+        game_vars.anarchy = False

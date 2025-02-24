@@ -18,10 +18,10 @@ class BasicEvents(commands.Cog):
         if message.content.startswith(self.bot.command_prefix):
             return
 
+        puzzle = self.bot.get_cog("Puzzle")
         if (
             random.randrange(100) < self.bot.prob_coin
-            and self.bot.game_vars.seeking_substr == ""
+            and not puzzle.is_puzzle_running()
             and message.guild
         ):
-            puzzle = self.bot.get_cog("Puzzle")
             await puzzle.spawn_puzzle(message.channel, self.bot.game_vars)

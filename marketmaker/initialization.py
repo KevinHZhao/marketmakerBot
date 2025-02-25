@@ -1,12 +1,11 @@
-import os
 import sqlite3
-import numpy as np
 from functools import partial
 from itertools import product
 from multiprocessing import Pool
 from pathlib import Path
 from string import ascii_lowercase
 
+import numpy as np
 from nltk.corpus import words
 
 STARTING_MONEY = 100000
@@ -15,7 +14,6 @@ DB_PATH = Path("marketmaker.db")  # relative to executable
 
 def ensure_db() -> None:
     """Ensures that the storage database exists and is initialized."""
-
     if not DB_PATH.exists():
         economy = sqlite3.connect(DB_PATH)
         cur = economy.cursor()

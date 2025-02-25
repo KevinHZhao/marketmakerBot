@@ -171,6 +171,21 @@ class General(commands.Cog):
         await ctx.send(ledger)
 
 
+    @commands.hybrid_command(name="crossword")
+    async def cmd_crossword(self: General, ctx, answer:str = None) -> None:
+        """
+        Displays a crossword puzzle for the user to solve.
+        """
+        xword = self.bot.get_cog("Crossword")
+        if not xword.crossword.current_word_list and xword.is_crossword_running():
+            await ctx.channel.send("Currently generating a crossword, please check back in a minute...")
+            return
+        if answer is None:
+            await xword.view_crossword(ctx.channel)
+        else:
+            await xword.check_crossword(ctx.channel, answer)
+
+
     @commands.hybrid_command(name="random")
     async def cmd_random_event(self: General, ctx, wager: int | None = None) -> None:
         """

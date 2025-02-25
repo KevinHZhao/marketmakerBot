@@ -6,6 +6,7 @@ import re
 import string
 import time
 from copy import copy as duplicate
+from string import ascii_uppercase
 
 
 class CrosswordBackend:
@@ -357,22 +358,16 @@ class CrosswordBackend:
         return outStr
 
 
-    def replace_letters_in_grid(grid, word):
-        # Create a mapping from word letters to A, B, C, ...
-        letter_mapping = {char: chr(65 + i) for i, char in enumerate(sorted(word))}
+    def replace_letters_in_solution(self, answer):
+        self.display()
+        soln = self.solution()
+        for i, char in enumerate(answer):
+            soln = soln.replace(char, ascii_uppercase[i], 1)
 
-        # Create a set of letters in the word to avoid mapping to the same grid letter
-        word_letters = set(word)
-
-        # Replace letters in the grid
-        for i in range(len(grid)):
-            for j in range(len(grid[i])):
-                if grid[i][j] in letter_mapping:
-                    grid[i][j] = letter_mapping[grid[i][j]]
-                elif grid[i][j].islower():
-                    grid[i][j] = ' '
-
-        return grid
+        for i in soln:
+            if i.islower():
+                soln = soln.replace(i, " ", 1)
+        return soln
 
 
     def display(self, order=True):

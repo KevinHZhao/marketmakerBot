@@ -62,17 +62,19 @@ class Crossword(commands.Cog):
         self.crossword.clear_grid()
         self.crossword.randomize_word_list()
         self.crossword.compute_crossword()
-        body = self.string_to_emojis(self.crossword.display())
-        guide = self.crossword.legend()
+        self.crossword.display() # This replaces the first letters with numbers so they can't be subbed out
         avail = Counter([x for xs in self.crossword.grid for x in xs if str(x).isalpha()])
+        filtered_words = self.filter_words([x.word for x in self.words], avail)
+        self.answer = random.choice(filtered_words)
+        body = self.string_to_emojis(self.crossword.replace_letters_in_solution(self.answer))
+        guide = self.crossword.legend()
 
         print(repr(body))
         print(self.crossword.display())
+        print(self.crossword.solution())
         print(self.crossword.current_word_list)
 
-        filtered_words = self.filter_words([x.word for x in self.words], avail)
-        self.answer = random.choice(filtered_words)
-        self.result = f"{body}\n\n{guide}\n\nEnter your answer as {''.join(ascii_uppercase[:len(self.answer)])}."
+        self.result = f"{body}\n{guide}\nEnter your answer as the word {''.join(ascii_uppercase[:len(self.answer)])}, substituting in the letters represented by the capitals from the solved crossword."
 
 
     async def view_crossword(self, channel: discord.TextChannel) -> None:

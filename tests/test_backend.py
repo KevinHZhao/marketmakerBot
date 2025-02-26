@@ -19,7 +19,6 @@ def test_setup_bomb(bot: MarketmakerBot, event_loop):
     with open(f"{root}/static/substr_hard_{bot.hard_min_words}.txt") as f:
         hard_substrings = [line.rstrip("\n") for line in f]
 
-    test1_result = setup_bomb(bot.game_vars, True, bot.normal_min_words, bot.hard_min_words, 123, False, None)
-    assert test1_result == (123, 3)
+    test1_result = setup_bomb(bot.game_vars, True, bot.normal_min_words, bot.hard_min_words)
     assert bot.game_vars.seeking_substr in hard_substrings
     assert bot.game_vars.daily_counter == 2

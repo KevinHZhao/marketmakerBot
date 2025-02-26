@@ -31,7 +31,7 @@ class LetterBowlBackend:
 
 
     def check_word(self, word:str) -> bool:
-        return bool(len(word) >= self.minwlen and enchant_dict.check(word.lower()))
+        return bool(len(word) >= self.minwlen and enchant_dict.check(word.lower()) and all(let in self.letters for let in word.lower()))
 
 
     def increment(self, word:str):

@@ -91,7 +91,7 @@ class Crossword(commands.Cog):
         print(guide)
         print(self.crossword.current_word_list)
 
-        self.result = f"{body}\n{guide}\nEnter your answer as the word {''.join([self.emojidict[x] for x in [ascii_uppercase[:len(self.answer)]]])}, substituting in the letters represented by the symbols from the solved crossword."
+        self.result = f"{body}\n{guide}\nEnter your answer as the word {''.join([self.emojidict[x] for x in list(ascii_uppercase[:len(self.answer)])])}, substituting in the letters represented by the symbols from the solved crossword."
 
 
     async def view_crossword(self, channel: discord.TextChannel) -> None:

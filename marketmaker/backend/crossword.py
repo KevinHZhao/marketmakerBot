@@ -383,7 +383,7 @@ class CrosswordBackend:
  
         for r in range(copy.rows):
             for c in copy.grid[r]:
-                outStr += '%s' % c
+                outStr += '%s​' % c # There is a zero width space after %s
             outStr += '\n'
  
         outStr = re.sub(r'[a-z]', ' ', outStr)
@@ -413,7 +413,8 @@ class CrosswordBackend:
         for word in self.current_word_list:
             clue_synsets = word.clue
             synlist = list(set([syn.name().split(".", 1)[0] for syn in clue_synsets]))
-            raw_examples = random.choice(clue_synsets).examples()
+            valid_for_ex = [x for x,y in zip(clue_synsets, synlist) if y == word.word]
+            raw_examples = random.choice(valid_for_ex).examples()
             if random.randint(0,1) == 1 or not raw_examples:
                 ## Clue is based on definition of word, forced if no example
                 formatted_clue = self.replace_words_with_underscores(random.choice(clue_synsets).definition(), synlist, len(word.word))

@@ -20,6 +20,20 @@ class Crossword(commands.Cog):
         self.lock = asyncio.Lock()
         self.result = ""
         self.answer = ""
+        self.emojidict: dict = {}
+
+
+    def reset_emoji_dict(self):
+        emoji_symbols = [
+            '⬅️', '➡️', '⬆️', '⬇️', '🔄', '🔃', '🔙', '🔚', '🔛', '🔜', '🔝', '⏪', '⏩', '⏫', '⏬', '🔼', '🔽',
+            '⏮️', '⏭️', '⏯️', '⏸️', '⏹️', '⏺️', '⏏️', '🎦', '🔅', '🔆', '📶', '📳', '📴', '🔋', '🔌', '💡',
+            '🔦', '🕯️', '🛢️', '💸', '💵', '💴', '💶', '💷', '💰', '💳', '💎', '⚖️', '🔧', '🔨', '⚒️', '🛠️',
+            '⛏️', '🔩', '⚙️', '🗜️', '⚗️', '🔬', '🔭', '📡', '💉', '💊', '🚪', '🛏️', '🛋️', '🚽', '🚿', '🛁',
+            '🛒', '🚬', '⚰️', '⚱️', '🗿', '🛎️', '🧳', '⌛', '⏳', '⌚', '⏰', '⏱️', '⏲️', '🕰️', '🌡️', '⛱️',
+            '🧯', '🛠️', '🧰', '🧲', '🧪', '🧫', '🧬', '🧴', '🧷', '🧹', '🧺', '🧻', '🧼', '🧽', '🧯', '🛒'
+        ]
+        random.shuffle(emoji_symbols)
+        self.emojidict = {letter: emoji for letter, emoji in zip(ascii_uppercase, emoji_symbols)}
 
 
     def is_crossword_running(self) -> bool:
@@ -49,7 +63,7 @@ class Crossword(commands.Cog):
         elif char.isdigit():
             return f'{char}️⃣'
         elif char.isupper():
-            return chr(ord(char) + 127397)  # Convert 'A' to '🇦', 'B' to '🇧', etc.
+            return self.emojidict[char]  # Convert 'A' to '🇦', 'B' to '🇧', etc.
         else:
             return char
 
@@ -59,6 +73,8 @@ class Crossword(commands.Cog):
 
 
     def setup_crossword(self):
+        self.reset_emoji_dict()
+        self.crossword.current_word_list = []
         self.crossword.clear_grid()
         self.crossword.randomize_word_list()
         self.crossword.compute_crossword()
@@ -72,9 +88,10 @@ class Crossword(commands.Cog):
         print(repr(body))
         print(self.crossword.display())
         print(self.crossword.solution())
+        print(guide)
         print(self.crossword.current_word_list)
 
-        self.result = f"{body}\n{guide}\nEnter your answer as the word {''.join(ascii_uppercase[:len(self.answer)])}, substituting in the letters represented by the capitals from the solved crossword."
+        self.result = f"{body}\n{guide}\nEnter your answer as the word {''.join([self.emojidict[x] for x in [ascii_uppercase[:len(self.answer)]]])}, substituting in the letters represented by the symbols from the solved crossword."
 
 
     async def view_crossword(self, channel: discord.TextChannel) -> None:

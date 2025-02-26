@@ -5,7 +5,12 @@ from multiprocessing import Pool
 from pathlib import Path
 from string import ascii_lowercase
 
+import nltk
 import numpy as np
+
+nltk.download("words")
+nltk.download("wordnet")
+
 from nltk.corpus import words
 
 STARTING_MONEY = 100000

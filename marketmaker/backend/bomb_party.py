@@ -9,7 +9,6 @@ import enchant
 from marketmaker.backend.db import (
     bonus_transfer,
     fetch_wallet_amount,
-    generate_victim,
     wallet_transfer_backend,
 )
 from marketmaker.subclass import GameVars
@@ -21,44 +20,21 @@ def setup_bomb(
     bonus: bool,
     normal_min_words: int,
     hard_min_words: int,
-    coin_value: Optional[int] = None,
-    anarchy_override: bool = False,
-    anarchy_victim: discord.Member = None,
-) -> tuple[int, int]:
-    bank_money = fetch_wallet_amount("BANK")
-
+):
     root = Path(__file__).parents[2]
 
-    with open(f"{root}/static/substr_normal_{normal_min_words}.txt", "r") as f:
-        normal_substrings = [line.rstrip("\n") for line in f]
+    if bonus:
+        print("BONUS TIME")
 
-    game_vars.seeking_substr = random.choice(normal_substrings)
+        with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "r") as f:
+            hard_substrings = [line.rstrip("\n") for line in f]
 
-    if anarchy_override:
-        game_vars.victimid = anarchy_victim.id
-        coin_value = fetch_wallet_amount(anarchy_victim.id)
-        outcome = 1
-    elif game_vars.anarchy:
-        game_vars.victimid, victim_money = generate_victim()
-        game_vars.victimid = int(game_vars.victimid)
-        coin_value = random.randrange(1, math.ceil(victim_money / 4 + 1))
-        outcome = 2
+        game_vars.seeking_substr = random.choice(hard_substrings)
     else:
-        if coin_value is None:
-            coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
-        if bonus:
-            print("BONUS TIME")
+        with open(f"{root}/static/substr_normal_{normal_min_words}.txt", "r") as f:
+            normal_substrings = [line.rstrip("\n") for line in f]
 
-            with open(f"{root}/static/substr_hard_{hard_min_words}.txt", "r") as f:
-                hard_substrings = [line.rstrip("\n") for line in f]
-
-            game_vars.seeking_substr = random.choice(hard_substrings)
-            game_vars.daily_counter -= 1
-            outcome = 3
-        else:
-            outcome = 4
-
-    return (coin_value, outcome)
+        game_vars.seeking_substr = random.choice(normal_substrings)
 
 
 def check_bomb(word:str, game_vars:GameVars) -> bool:

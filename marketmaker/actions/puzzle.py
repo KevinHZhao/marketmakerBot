@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import math
 import random
+from functools import partial
 from typing import TYPE_CHECKING
 
 from discord.ext import commands
@@ -10,10 +12,13 @@ from discord.ext import commands
 from marketmaker.backend.bomb_party import check_bomb, finish_bomb, setup_bomb
 from marketmaker.backend.db import (
     add_used_word,
+    bonus_transfer,
     fetch_used_words,
     fetch_wallet_amount,
+    generate_victim,
     timer_board_add,
 )
+from marketmaker.backend.letter_bowl import LetterBowlBackend
 
 if TYPE_CHECKING:
     import discord
@@ -25,10 +30,173 @@ class Puzzle(commands.Cog):
     def __init__(self: Puzzle, bot) -> None:
         self.bot = bot
         self.lock = asyncio.Lock()
+        self.coin_value = 0
+        self.anarchy_override = False
+        self.outcome: None | int = None
+        self.lb = LetterBowlBackend()
+        self.bonus = False
 
 
     def is_puzzle_running(self:Puzzle) -> bool:
         return self.lock.locked()
+
+
+    async def spawn_lb(
+        self: Puzzle,
+        vicmen: discord.mentions,
+        game_vars: GameVars,
+        victim: discord.Member,
+        channel: discord.TextChannel,
+        bonus_value: int,
+    ):
+        self.lb.restart()
+
+        letters = ", ".join(self.lb.letters)
+
+        spawn_msgs = {
+            1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim some of them by typing a word using only the letters `{letters}` within 20 seconds!",
+            2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {self.coin_value}$!  You can claim some of them by typing a word using only the letters `{letters}` within 20 seconds!",
+            3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value}$ plus another {bonus_value}$ per word in the streak!  You can claim some of them by typing a word using only the letters `{letters}` within 20 seconds!",
+            4: f":coin: Coins :coin: from the bank have spawned, valued at {self.coin_value}$!  You can claim some of them by typing a word with only the letters `{letters}` within 20 seconds!",
+        }
+
+        announce = await channel.send(spawn_msgs[self.outcome], delete_after=20)
+        results: tuple | None | int = 0
+        winmsg = None
+        while results is not None:
+            results = await self.test_lb(channel, announce)
+            if results is not None:
+                winmsg, elapsed_time = results
+                await announce.delete()
+                await winmsg.add_reaction("👍")
+                announce = await channel.send(f"{winmsg.author} got it using {len(winmsg.content)} letters (took {elapsed_time:.2f} sec).  Anyone can increase the winnings and take the prize by typing a longer word using only the letters `{letters}` within 20 seconds!", delete_after=20)
+                if round(elapsed_time % 10, 2) == 7.27:
+                    bonus_transfer(winmsg.author.id, 727)
+                    await channel.send(f"WYSI buff applied, {winmsg.author} has received 727$ from out of thin air as a bonus.")
+
+        if winmsg is None:
+            await self.failed(game_vars, channel)
+        else:
+            await self.complete_lb(channel, game_vars, bonus_value, winmsg, elapsed_time, victim)
+
+
+    async def complete_lb(
+        self,
+        channel: discord.TextChannel,
+        game_vars: GameVars,
+        bonus_value: int,
+        msg: discord.Message,
+        elapsed_time: float,
+        victim: str | discord.Member,
+    ) -> None:
+        if game_vars.victimid:
+            score, to_winner, bonus_prize = self.lb.finish(self.coin_value, msg.author.id, bonus_value * self.bonus, game_vars.victimid)
+        else:
+            score, to_winner, bonus_prize = self.lb.finish(self.coin_value, msg.author.id, bonus_value * self.bonus)
+        spawn_msgs = {
+            1: f"Time's up!  {msg.author} is our winner after a streak of {score} words (took {elapsed_time:.2f} sec), so their money will be left alone.",
+            2: f"Time's up!  {msg.author} is our winner after a streak of {score} words (took {elapsed_time:.2f} sec), and {to_winner}$ has been sent their wallet out of {victim}'s wallet, with the remainder of the {self.coin_value}$ prize pool going to the bank!",
+            3: f"Time's up!  {msg.author} is our winner after a streak of {score} words (took {elapsed_time:.2f} sec), and {to_winner + bonus_prize}$ has been deposited into their wallet!  The economy has just grown by {bonus_prize}$!",
+            4: f"Time's up!  {msg.author} is our winner after a streak of {score} words (took {elapsed_time:.2f} sec), and {to_winner}$ has been deposited into their wallet!",
+        }
+        if game_vars.anarchy or self.anarchy_override:
+            res = 2 if game_vars.victimid != msg.id else 1
+        else:
+            res = 3 if self.bonus else 4
+
+        await channel.send(spawn_msgs[res], delete_after=10)
+
+        game_vars.victimid = None
+        self.coin_value = 0
+        self.outcome = None
+        self.bonus = False
+
+
+    async def test_lb(
+        self,
+        channel: discord.TextChannel,
+        announce: discord.Message,
+    ) -> tuple[discord.Message, float] | None:
+        def check(m: discord.Message) -> bool:
+            if not m.content:
+                return False
+            return self.lb.check_word(m.content.lower()) and m.channel == channel
+
+        start_time = announce.created_at
+        elapsed_time = 0.0
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=20.0)
+            elapsed_time = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+        except TimeoutError:
+            return None
+
+        self.lb.increment(msg.content)
+
+        return (msg, elapsed_time)
+
+
+    def setup_coin(self:Puzzle, game_vars: GameVars, anarchy_victim: discord.Member):
+        bank_money = fetch_wallet_amount("BANK")
+        if self.anarchy_override:
+            game_vars.victimid = anarchy_victim.id
+            self.coin_value = fetch_wallet_amount(anarchy_victim.id)
+            self.outcome = 1
+        elif game_vars.anarchy:
+            game_vars.victimid, victim_money = generate_victim()
+            game_vars.victimid = int(game_vars.victimid)
+            self.coin_value = random.randrange(1, math.ceil(victim_money / 4 + 1))
+            self.outcome = 2
+        else:
+            if self.coin_value is None:
+                self.coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
+            if self.bonus:
+                print("BONUS TIME")
+                game_vars.daily_counter -= 1
+                self.outcome = 3
+            else:
+                self.outcome = 4
+
+
+    async def spawn_bp(
+        self:Puzzle,
+        vicmen:discord.mentions,
+        game_vars:GameVars,
+        victim:discord.Member,
+        channel:discord.TextChannel,
+        bonus_value:int,
+    ):
+        setup_bomb(game_vars, self.bonus, self.bot.normal_min_words, self.bot.hard_min_words)
+        bonus_value = 2 * bonus_value # Make this puzzle have a larger bonus
+
+        spawn_msgs = {
+            1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+            2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {self.coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+            3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value + bonus_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+            4: f":coin: Coins :coin: from the bank have spawned, valued at {self.coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
+        }
+
+        announce = await channel.send(spawn_msgs[self.outcome], delete_after=30)
+        results = await self.test_bp(channel, game_vars, announce)
+
+        if results is None:
+            await self.failed(game_vars, channel)
+        else:
+            answer, elapsed_time = results
+
+            if round(elapsed_time % 10, 2) == 7.27:
+                extra_bonus = round(bonus_value * 7.27)
+                bonus_value = bonus_value * self.bonus + extra_bonus
+                self.bonus = True
+                await channel.send(f"WYSI buff applied, extra bonus applied to this puzzle of {extra_bonus}$.")
+            await self.complete_bp(
+                announce,
+                channel,
+                game_vars,
+                bonus_value,
+                answer,
+                elapsed_time,
+                victim,
+            )
 
 
     async def spawn_puzzle(
@@ -36,7 +204,7 @@ class Puzzle(commands.Cog):
         channel: discord.TextChannel,
         game_vars: GameVars,
         coin_value: int | None = None,
-        bonus_value: int = 100,
+        bonus_value: int = 50,
         anarchy_override: bool = False,
         anarchy_victim: discord.Member = None,
     ) -> None:
@@ -47,27 +215,30 @@ class Puzzle(commands.Cog):
         async with self.lock:
             bank_money = fetch_wallet_amount("BANK")
             total_money = fetch_wallet_amount("TOTAL")
+            self.anarchy_override = anarchy_override
 
             if game_vars.anarchy:
                 game_vars.anarchy = bank_money < total_money / 5
             else:
                 game_vars.anarchy = bank_money < total_money / 90
 
-            if anarchy_override and fetch_wallet_amount(anarchy_victim.id) == 0:
+            if self.anarchy_override and fetch_wallet_amount(anarchy_victim.id) == 0:
                 await channel.send(
                     f"We were going to put all of {anarchy_victim.mention}'s money up for a puzzle, but they don't have any left!  Nothing happens...",
                 )
                 return
 
-            bonus = game_vars.daily_counter > 0 and random.randrange(10) == 9
-            coin_value, outcome = setup_bomb(game_vars, bonus, self.bot.normal_min_words, self.bot.hard_min_words, coin_value, anarchy_override, anarchy_victim)
+            self.bonus = game_vars.daily_counter > 0 and random.randrange(10) == 9
 
+            self.coin_value = coin_value
+
+            self.setup_coin(game_vars, anarchy_victim)
             if game_vars.victimid is None:
                 # This is a failsafe, but it should never be reached
                 victim = "ERROR NO VICTIM"
                 vicmen = "ERROR NO VICTIM"
             else:
-                if anarchy_override:
+                if self.anarchy_override:
                     victim = anarchy_victim
                     game_vars.victimid = anarchy_victim.id
                 else:
@@ -76,42 +247,16 @@ class Puzzle(commands.Cog):
                 game_vars.anarchy = True
                 vicmen = victim.mention
 
-            spawn_msgs = {
-                1: f"{vicmen}, all {coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-                2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-                3: f":dollar: Bonus Coins :dollar: have spawned, valued at {coin_value + bonus_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-                4: f":coin: Coins :coin: from the bank have spawned, valued at {coin_value}$!  You can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
-            }
+            bp = partial(self.spawn_bp, vicmen, game_vars, victim, channel, bonus_value)
+            lb = partial(self.spawn_lb, vicmen, game_vars, victim, channel, bonus_value)
 
-            announce = await channel.send(spawn_msgs[outcome], delete_after=30)
-            results = await self.test_puzzle(channel, game_vars, announce)
+            funcs = [bp, lb]
+            selected_fun = random.choice(funcs)
 
-            if results is None:
-                await self.failed_answer(game_vars, channel, coin_value)
-            else:
-                answer, elapsed_time = results
+            await selected_fun()
 
-                if round(elapsed_time % 10, 2) == 7.27:
-                    extra_bonus = round(bonus_value * 7.27)
-                    bonus_value = bonus_value * bonus + extra_bonus
-                    bonus = True
-                    await channel.send(f"WYSI buff applied, extra bonus applied to this puzzle of {extra_bonus}$.")
-                await self.complete_puzzle(
-                    announce,
-                    channel,
-                    game_vars,
-                    coin_value,
-                    bonus_value,
-                    answer,
-                    elapsed_time,
-                    bonus,
-                    anarchy_override,
-                    victim,
-                )
 
-            return
-
-    async def test_puzzle(
+    async def test_bp(
         self,
         channel: discord.TextChannel,
         game_vars: GameVars,
@@ -158,21 +303,20 @@ class Puzzle(commands.Cog):
         return (msg, elapsed_time)
 
 
-    async def failed_answer(
+    async def failed(
         self: Puzzle,
         game_vars: GameVars,
         channel: discord.TextChannel,
-        coin_value: int,
     ) -> None:
         if game_vars.anarchy:
             assert game_vars.victimid is not None
             victim = await self.bot.fetch_user(game_vars.victimid)
             await channel.send(
-                f"Time's up!  No one claimed the :coin: Coins :coin: so {victim}'s {coin_value}$ are going to the bank!",
+                f"Time's up!  No one claimed the :coin: Coins :coin: so {victim}'s {self.coin_value}$ are going to the bank!",
                 delete_after=10,
             )
             eco = self.bot.get_cog("Economy")
-            await eco.wallet_transfer(victim, "BANK", coin_value, channel, 3)
+            await eco.wallet_transfer(victim, "BANK", self.coin_value, channel, 3)
             game_vars.victimid = None
             game_vars.anarchy = False
         else:
@@ -181,30 +325,31 @@ class Puzzle(commands.Cog):
                 delete_after=10,
             )
         game_vars.seeking_substr = ""
+        self.coin_value = 0
+        game_vars.victimid = None
+        self.outcome = None
+        self.bonus = False
 
 
-    async def complete_puzzle(
+    async def complete_bp(
         self,
         announce: discord.Message,
         channel: discord.TextChannel,
         game_vars: GameVars,
-        coin_value: int,
         bonus_value: int,
         msg: discord.Message,
         elapsed_time: float,
-        bonus: bool,
-        anarchy_override: bool,
-        victim: str | discord.User,
+        victim: str | discord.Member,
     ) -> None:
         await announce.delete()
         await msg.add_reaction("👍")
 
-        outcome = finish_bomb(game_vars, anarchy_override, bonus, bonus_value, msg.author.id, coin_value)
+        outcome = finish_bomb(game_vars, self.anarchy_override, self.bonus, bonus_value, msg.author.id, self.coin_value)
         spawn_msgs = {
             1: f"{msg.author} got it (took {elapsed_time:.2f} sec), so their money will be left alone.  `{msg.content.lower()}` has now been added to the list of used words.",
-            2: f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value}$ has been split between the bank and their wallet, out of {victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
-            3: f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value + bonus_value}$ has been deposited into their wallet!  The economy has just grown by {bonus_value}$!  `{msg.content.lower()}` has now been added to the list of used words.",
-            4: f"{msg.author} got it (took {elapsed_time:.2f} sec), and {coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+            2: f"{msg.author} got it (took {elapsed_time:.2f} sec), and {self.coin_value}$ has been split between the bank and their wallet, out of {victim}'s wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
+            3: f"{msg.author} got it (took {elapsed_time:.2f} sec), and {self.coin_value + bonus_value}$ has been deposited into their wallet!  The economy has just grown by {bonus_value}$!  `{msg.content.lower()}` has now been added to the list of used words.",
+            4: f"{msg.author} got it (took {elapsed_time:.2f} sec), and {self.coin_value}$ has been deposited into their wallet!  `{msg.content.lower()}` has now been added to the list of used words.",
         }
 
         await channel.send(spawn_msgs[outcome], delete_after=10)
@@ -213,4 +358,6 @@ class Puzzle(commands.Cog):
         add_used_word(msg.content.lower())
         game_vars.seeking_substr = ""
         game_vars.victimid = None
-        game_vars.anarchy = False
+        self.coin_value = 0
+        self.outcome = None
+        self.bonus = False

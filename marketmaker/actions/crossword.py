@@ -91,12 +91,13 @@ class Crossword(commands.Cog):
         print(guide)
         print(self.crossword.current_word_list)
 
-        self.result = f"{body}\n{guide}\nEnter your answer as the word {''.join([self.emojidict[x] for x in list(ascii_uppercase[:len(self.answer)])])}, substituting in the letters represented by the symbols from the solved crossword."
+        self.result = f"{body}\n```{guide}```\nEnter your answer as the word {''.join([self.emojidict[x] for x in list(ascii_uppercase[:len(self.answer)])])}, substituting in the letters represented by the symbols from the solved crossword."
+        print(self.result)
 
 
     async def view_crossword(self, channel: discord.TextChannel) -> None:
         if not self.crossword.current_word_list and not self.lock.locked():
-            asyncio.run(self.setup_crossword())
+            self.setup_crossword()
         if not self.crossword.current_word_list and self.lock.locked():
             await channel.send("Currently generating a crossword, please check back in a minute...")
             return
@@ -109,7 +110,7 @@ class Crossword(commands.Cog):
             self.crossword.current_word_list = []
             self.answer = ""
             await channel.send("Correct!  You get nothing since this is still in development")
-            asyncio.run(self.setup_crossword())
+            self.setup_crossword()
         else:
             await channel.send("Incorect!")
 

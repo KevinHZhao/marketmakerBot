@@ -398,12 +398,11 @@ class CrosswordBackend:
             outStr += "%s\n" % word.word
         return outStr
 
-    def replace_words_with_underscores(self, clue, synlist, nund):
-        for word in synlist:
-            # Create a regex pattern to match the word with word boundaries
-            pattern = r'\b' + re.escape(word) # + r'\b' want to keep conjugations ideally
-            # Replace the word with underscores of the same length
-            clue = re.sub(pattern, '_' * nund, clue, flags=re.IGNORECASE)
+    def replace_words_with_underscores(self, clue, word, nund):
+        # Create a regex pattern to match the word with word boundaries
+        pattern = r'\b' + re.escape(word) # + r'\b' want to keep conjugations ideally
+        # Replace the word with underscores of the same length
+        clue = re.sub(pattern, '_' * nund, clue, flags=re.IGNORECASE)
         return clue
 
     def legend(self):
@@ -425,7 +424,7 @@ class CrosswordBackend:
                 ## Clue is based on synonym or example of word
                 formatted_clue = self.replace_words_with_underscores(random.choice(raw_examples), word.word, len(word.word))
 
-            outStr += "%d. %s: `%s`\n" % (word.number, word.down_across(), formatted_clue)
+            outStr += "%d. %s: %s\n" % (word.number, word.down_across(), formatted_clue)
         return outStr
 
     def solution2json(self):

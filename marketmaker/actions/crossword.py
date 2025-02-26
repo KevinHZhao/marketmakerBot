@@ -96,7 +96,7 @@ class Crossword(commands.Cog):
 
     async def view_crossword(self, channel: discord.TextChannel) -> None:
         if not self.crossword.current_word_list and not self.lock.locked():
-            self.setup_crossword()
+            asyncio.run(self.setup_crossword())
         if not self.crossword.current_word_list and self.lock.locked():
             await channel.send("Currently generating a crossword, please check back in a minute...")
             return
@@ -109,7 +109,7 @@ class Crossword(commands.Cog):
             self.crossword.current_word_list = []
             self.answer = ""
             await channel.send("Correct!  You get nothing since this is still in development")
-            self.setup_crossword()
+            asyncio.run(self.setup_crossword())
         else:
             await channel.send("Incorect!")
 

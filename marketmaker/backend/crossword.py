@@ -414,13 +414,16 @@ class CrosswordBackend:
             clue_synsets = word.clue
             synlist = list(set([syn.name().split(".", 1)[0] for syn in clue_synsets]))
             valid_for_ex = [x for x,y in zip(clue_synsets, synlist) if y == word.word]
-            raw_examples = random.choice(valid_for_ex).examples()
+            if valid_for_ex:
+                raw_examples = random.choice(valid_for_ex).examples()
+            else:
+                raw_examples = None
             if random.randint(0,1) == 1 or not raw_examples:
                 ## Clue is based on definition of word, forced if no example
-                formatted_clue = self.replace_words_with_underscores(random.choice(clue_synsets).definition(), synlist, len(word.word))
+                formatted_clue = self.replace_words_with_underscores(random.choice(clue_synsets).definition(), word.word, len(word.word))
             else:
                 ## Clue is based on synonym or example of word
-                formatted_clue = self.replace_words_with_underscores(random.choice(raw_examples), synlist, len(word.word))
+                formatted_clue = self.replace_words_with_underscores(random.choice(raw_examples), word.word, len(word.word))
 
             outStr += "%d. %s: `%s`\n" % (word.number, word.down_across(), formatted_clue)
         return outStr

@@ -8,19 +8,30 @@ from discord.ext import commands
 from nltk.corpus import wordnet as wn
 
 import marketmaker.backend.crossword as cw
+from marketmaker.backend.db import fetch_used_words
 
 
 class Crossword(commands.Cog):
     def __init__(self, bot) -> None:
         self.bot = bot
-        wlist = [ n for n in wn.all_lemma_names() if 3 <= len(n) <= 7 and n.isalpha() ]
-        clues = [wn.synsets(word) for word in wlist]
-        self.words = [cw.Word(word = word, clue = clue) for word, clue in zip(wlist, clues)]
-        self.crossword = cw.CrosswordBackend(rows = 7, cols = 7, available_words = self.words)
+        self.wlist: list = []
+        self.clues: list = []
+        self.words: list = []
         self.lock = asyncio.Lock()
         self.result = ""
         self.answer = ""
         self.emojidict: dict = {}
+        self.crossword = cw.CrosswordBackend(rows = 7, cols = 7, available_words = [cw.Word(word = "ERROR", clue = wn.synsets("error"))])
+        self.reset_emoji_dict()
+        self.refresh_words()
+
+
+    def refresh_words(self):
+        raw_wlist = list(set([wn.synsets(x)[0].name().split(".", 1)[0] for x in fetch_used_words() if wn.synsets(x)]))
+        self.wlist = [x for x in raw_wlist if 2 <= len(x) <= 7]
+        self.clues = [wn.synsets(word) for word in self.wlist]
+        self.words = [cw.Word(word = word, clue = clue) for word, clue in zip(self.wlist, self.clues)]
+        self.crossword.available_words = self.words
 
 
     def reset_emoji_dict(self):
@@ -73,6 +84,7 @@ class Crossword(commands.Cog):
 
 
     def setup_crossword(self):
+        self.refresh_words()
         self.reset_emoji_dict()
         self.crossword.current_word_list = []
         self.crossword.clear_grid()

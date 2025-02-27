@@ -13,6 +13,7 @@ from marketmaker.backend.db import (
     build_timetrial,
     fetch_used_words,
     fetch_wallet_amount,
+    bonus_transfer,
 )
 from marketmaker.used_menus import MyMenuPages, MySource
 
@@ -21,6 +22,19 @@ class General(commands.Cog):
     def __init__(self: General, bot) -> None:
         self.bot = bot
 
+    
+    @commands.hybrid_command(name="beg")
+    async def cmd_beg(self: General, ctx) -> None:
+        """
+        Gives you a dollar if you have nothing.
+        """
+        money = fetch_wallet_amount(ctx.author.id)
+        if money == 0:
+            bonus_transfer(ctx.author.id, 1)
+            await ctx.send(f"{ctx.author}, you poor thing.  Fine, you can have a bonus dollar.")
+        else:
+            await ctx.send(f"{ctx.author} you've still got money to spend!  Come back when you've actually hit rock bottom.")
+        
 
     @commands.hybrid_command(name="wallet")
     async def cmd_wallet(self: General, ctx, target: discord.Member = None) -> None:

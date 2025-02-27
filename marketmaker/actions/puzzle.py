@@ -70,11 +70,11 @@ class Puzzle(commands.Cog):
                 winmsg, elapsed_time = results
                 await announce.delete()
                 await winmsg.add_reaction("👍")
+                time_lim = random.randrange(20, 60)
                 announce = await channel.send(f"{winmsg.author} got it using {len(winmsg.content)} letters (took {elapsed_time:.2f} sec).  Anyone can increase the winnings and take the prize by typing a longer word using only the letters `{letters}` within {time_lim} seconds!", delete_after=time_lim)
                 if round(elapsed_time % 10, 2) == 7.27:
                     bonus_transfer(winmsg.author.id, 727)
                     await channel.send(f"WYSI buff applied, {winmsg.author} has received 727$ from out of thin air as a bonus.")
-                time_lim = random.randrange(20, 60)
 
         if winmsg is None:
             await self.failed(game_vars, channel)

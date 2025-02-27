@@ -1,10 +1,11 @@
 import math
-from typing import List, Literal, Optional
-import enchant
 import random
 from string import ascii_lowercase
+from typing import List, Literal
 
-from marketmaker.backend.db import wallet_transfer_backend, bonus_transfer
+import enchant
+
+from marketmaker.backend.db import bonus_transfer, wallet_transfer_backend
 
 enchant_dict = enchant.Dict("en_CA")
 
@@ -26,7 +27,7 @@ class LetterBowlBackend:
         templet = [random.choice(vow1), random.choice(vow2), random.choice(cons1), random.choice(cons2), random.sample(cons3, 2), random.sample(cons4, 3)]
         templet = [j for i in templet for j in i]
         self.letters = sorted(list(set(templet + random.sample(ascii_lowercase, 4))))
-        self.lettercount = 0
+        self.wordcount = 0
         self.minwlen = 1
 
 

@@ -52,12 +52,12 @@ class LetterBowlBackend:
                 wallet_transfer_backend(sendid = vicid, recid = "BANK", amount = prize, transaction = 3)
         else:
             to_winner = max(math.ceil(prize * score / 7), prize)
-            if vicid != "BANK":
+            if winid == vicid:
+                to_winner = 0
+            elif vicid != "BANK":
                 to_winner = min(to_winner, math.ceil(prize * 3 / 4))
                 wallet_transfer_backend(sendid = vicid, recid = "BANK", amount = prize - to_winner, transaction = 3)
                 wallet_transfer_backend(sendid = vicid, recid = winid, amount = to_winner, transaction = 3)
-            elif winid == vicid:
-                to_winner = 0
             else:
                 wallet_transfer_backend(sendid = "BANK", recid = winid, amount = to_winner, transaction = 2)
 

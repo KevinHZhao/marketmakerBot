@@ -52,27 +52,29 @@ class Puzzle(commands.Cog):
         self.lb.restart()
 
         letters = ", ".join(self.lb.letters)
+        time_lim = random.randrange(20, 60)
 
         spawn_msgs = {
-            1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim some of them by typing a word using only the letters `{letters}` within 20 seconds!",
-            2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {self.coin_value}$!  You can claim some of them by typing a word using only the letters `{letters}` within 20 seconds!",
-            3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value}$ plus another {bonus_value}$ per word in the streak!  You can claim some of them by typing a word using only the letters `{letters}` within 20 seconds!",
-            4: f":coin: Coins :coin: from the bank have spawned, valued at {self.coin_value}$!  You can claim some of them by typing a word with only the letters `{letters}` within 20 seconds!",
+            1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim some of them by typing a word using only the letters `{letters}` within {time_lim} seconds!",
+            2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {self.coin_value}$!  You can claim some of them by typing a word using only the letters `{letters}` within {time_lim} seconds!",
+            3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value}$ plus another {bonus_value}$ per word in the streak!  You can claim some of them by typing a word using only the letters `{letters}` within {time_lim} seconds!",
+            4: f":coin: Coins :coin: from the bank have spawned, valued at {self.coin_value}$!  You can claim some of them by typing a word with only the letters `{letters}` within {time_lim} seconds!",
         }
 
         announce = await channel.send(spawn_msgs[self.outcome], delete_after=20)
         results: tuple | None | int = 0
         winmsg = None
         while results is not None:
-            results = await self.test_lb(channel, announce)
+            results = await self.test_lb(channel, announce, time_lim)
             if results is not None:
                 winmsg, elapsed_time = results
                 await announce.delete()
                 await winmsg.add_reaction("👍")
-                announce = await channel.send(f"{winmsg.author} got it using {len(winmsg.content)} letters (took {elapsed_time:.2f} sec).  Anyone can increase the winnings and take the prize by typing a longer word using only the letters `{letters}` within 20 seconds!", delete_after=20)
+                announce = await channel.send(f"{winmsg.author} got it using {len(winmsg.content)} letters (took {elapsed_time:.2f} sec).  Anyone can increase the winnings and take the prize by typing a longer word using only the letters `{letters}` within {time_lim} seconds!", delete_after=20)
                 if round(elapsed_time % 10, 2) == 7.27:
                     bonus_transfer(winmsg.author.id, 727)
                     await channel.send(f"WYSI buff applied, {winmsg.author} has received 727$ from out of thin air as a bonus.")
+                time_lim = random.randrange(20, 60)
 
         if winmsg is None:
             await self.failed(game_vars, channel)
@@ -116,6 +118,7 @@ class Puzzle(commands.Cog):
         self,
         channel: discord.TextChannel,
         announce: discord.Message,
+        time_lim: float
     ) -> tuple[discord.Message, float] | None:
         def check(m: discord.Message) -> bool:
             if not m.content:
@@ -125,7 +128,7 @@ class Puzzle(commands.Cog):
         start_time = announce.created_at
         elapsed_time = 0.0
         try:
-            msg = await self.bot.wait_for("message", check=check, timeout=20.0)
+            msg = await self.bot.wait_for("message", check=check, timeout=time_lim)
             elapsed_time = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
         except TimeoutError:
             return None

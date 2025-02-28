@@ -238,7 +238,7 @@ class General(commands.Cog):
         normal_puzzle = partial(puzzle.spawn_puzzle, channel = ctx.channel, game_vars = self.bot.game_vars)
 
         buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
-        buffed_puzzle = partial(puzzle.spawn_puzzle, channel = ctx.channel, game_vars = self.bot.game_vars, coin_value = buffed_value, bonus_value = 500)
+        buffed_puzzle = partial(puzzle.spawn_puzzle, channel = ctx.channel, game_vars = self.bot.game_vars, coin_value = buffed_value, bonus_value = 2500)
 
         deflation = partial(eco.force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
         inflation = partial(eco.rand_inflation, channel = ctx.channel, user = ctx.author, wager = wager, amount = math.ceil(wager/2))

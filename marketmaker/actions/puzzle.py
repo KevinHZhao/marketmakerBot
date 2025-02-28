@@ -19,6 +19,7 @@ from marketmaker.backend.db import (
     timer_board_add,
 )
 from marketmaker.backend.letter_bowl import LetterBowlBackend
+from marketmaker.backend.phrase_hangman import HangmanBackend
 
 if TYPE_CHECKING:
     import discord
@@ -34,11 +35,107 @@ class Puzzle(commands.Cog):
         self.anarchy_override = False
         self.outcome: None | int = None
         self.lb = LetterBowlBackend()
+        self.ph = HangmanBackend()
         self.bonus = False
 
 
     def is_puzzle_running(self:Puzzle) -> bool:
         return self.lock.locked()
+
+
+    async def spawn_ph(
+        self: Puzzle,
+        vicmen: discord.mentions,
+        game_vars: GameVars,
+        victim: discord.Member,
+        channel: discord.TextChannel,
+        bonus_value: int,
+    ):
+        self.ph.begin_puzzle()
+        time_lim = 15
+
+        def gen_msg(time_left) -> dict:
+            return {
+                1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
+                2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {self.coin_value}$!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
+                3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value}$ plus another {bonus_value}$ per word in the streak!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
+                4: f":coin: Coins :coin: from the bank have spawned, valued at {self.coin_value}$!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
+            }
+
+        results: tuple | None | int = 0
+        winmsg = None
+        for i in [4, 3, 2, 1]:
+            time_left = time_lim * i
+            announce = await channel.send(gen_msg(time_left)[self.outcome], delete_after=time_lim)
+            results = await self.test_ph(channel, announce, time_lim)
+            if results is not None:
+                winmsg, elapsed_time = results
+                await announce.delete()
+                break
+            self.ph.build_guide()
+
+        if winmsg is None:
+            await self.failed(game_vars, channel)
+        else:
+            await winmsg.add_reaction("👍")
+            if round(elapsed_time % 10, 2) == 7.27:
+                bonus_transfer(winmsg.author.id, 727)
+                await channel.send(f"WYSI buff applied, {winmsg.author} has received 727$ from out of thin air as a bonus.")
+            await self.complete_ph(channel, game_vars, bonus_value, winmsg, elapsed_time, victim)
+
+
+    async def complete_ph(
+        self,
+        channel: discord.TextChannel,
+        game_vars: GameVars,
+        bonus_value: int,
+        msg: discord.Message,
+        elapsed_time: float,
+        victim: str | discord.Member,
+    ) -> None:
+        if game_vars.victimid:
+            self.lb.finish(self.coin_value, msg.author.id, bonus_value * self.bonus, game_vars.victimid)
+        else:
+            self.lb.finish(self.coin_value, msg.author.id, bonus_value * self.bonus)
+        spawn_msgs = {
+            1: f"{msg.author} got it (took {elapsed_time:.2f} sec after the last hint), so their money will be left alone.",
+            2: f"{msg.author} got it (took {elapsed_time:.2f} sec after the last hint), and {self.coin_value}$ has been split between them and the bank, out of {victim}'s wallet!",
+            3: f"{msg.author} got it (took {elapsed_time:.2f} sec after the last hint), and {self.coin_value + bonus_value}$ has been deposited into their wallet!  The economy has just grown by {bonus_value}$!",
+            4: f"{msg.author} got it (took {elapsed_time:.2f} sec after the last hint), and {self.coin_value}$ has been deposited into their wallet!",
+        }
+        if game_vars.anarchy or self.anarchy_override:
+            res = 2 if game_vars.victimid != msg.id else 1
+        else:
+            res = 3 if self.bonus else 4
+
+        await channel.send(spawn_msgs[res], delete_after=10)
+
+        game_vars.victimid = None
+        self.coin_value = 0
+        self.outcome = None
+        self.bonus = False
+
+
+    async def test_ph(
+        self,
+        channel: discord.TextChannel,
+        announce: discord.Message,
+        time_lim: float
+    ) -> tuple[discord.Message, float] | None:
+        def check(m: discord.Message) -> bool:
+            if not m.content:
+                return False
+            return self.ph.check(m.content.lower()) and m.channel == channel
+
+        start_time = announce.created_at
+        elapsed_time = 0.0
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=time_lim)
+            elapsed_time = (datetime.datetime.now(datetime.UTC) - start_time).total_seconds()
+        except TimeoutError:
+            return None
+
+        return (msg, elapsed_time)
 
 
     async def spawn_lb(
@@ -169,7 +266,6 @@ class Puzzle(commands.Cog):
         bonus_value:int,
     ):
         setup_bomb(game_vars, self.bonus, self.bot.normal_min_words, self.bot.hard_min_words)
-        bonus_value = 2 * bonus_value # Make this puzzle have a larger bonus
 
         spawn_msgs = {
             1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by typing a word with `{game_vars.seeking_substr}` within 30 seconds!",
@@ -207,7 +303,7 @@ class Puzzle(commands.Cog):
         channel: discord.TextChannel,
         game_vars: GameVars,
         coin_value: int | None = None,
-        bonus_value: int = 50,
+        bonus_value: int = 500,
         anarchy_override: bool = False,
         anarchy_victim: discord.Member = None,
     ) -> None:
@@ -250,11 +346,13 @@ class Puzzle(commands.Cog):
                 game_vars.anarchy = True
                 vicmen = victim.mention
 
-            bp = partial(self.spawn_bp, vicmen, game_vars, victim, channel, bonus_value)
+            bp = partial(self.spawn_bp, vicmen, game_vars, victim, channel, bonus_value * 2)
             lb = partial(self.spawn_lb, vicmen, game_vars, victim, channel, bonus_value)
+            ph = partial(self.spawn_ph, vicmen, game_vars, victim, channel, bonus_value * 2)
+            weights = (0.1, 0.1, 0.8) ## Want to debug the ph puzzle on prod...
 
-            funcs = [bp, lb]
-            selected_fun = random.choice(funcs)
+            funcs = [bp, lb, ph]
+            selected_fun = random.choices(funcs, weights = weights, k = 1)[0]
 
             await selected_fun()
 

@@ -1,14 +1,11 @@
 import math
 import random
 from pathlib import Path
-from typing import Optional
 
-import discord
 import enchant
 
 from marketmaker.backend.db import (
     bonus_transfer,
-    fetch_wallet_amount,
     wallet_transfer_backend,
 )
 from marketmaker.subclass import GameVars

@@ -95,9 +95,9 @@ class Puzzle(commands.Cog):
         victim: str | discord.Member,
     ) -> None:
         if game_vars.victimid:
-            self.lb.finish(self.coin_value, msg.author.id, bonus_value * self.bonus, game_vars.victimid)
+            self.ph.finish(self.coin_value, msg.author.id, bonus_value * self.bonus, game_vars.victimid)
         else:
-            self.lb.finish(self.coin_value, msg.author.id, bonus_value * self.bonus)
+            self.ph.finish(self.coin_value, msg.author.id, bonus_value * self.bonus)
         spawn_msgs = {
             1: f"{msg.author} got it (took {elapsed_time:.2f} sec after the last hint), so their money will be left alone.",
             2: f"{msg.author} got it (took {elapsed_time:.2f} sec after the last hint), and {self.coin_value}$ has been split between them and the bank, out of {victim}'s wallet!",
@@ -252,7 +252,6 @@ class Puzzle(commands.Cog):
                 self.coin_value = random.randrange(1, math.ceil(bank_money / 6 + 10))
             if self.bonus:
                 print("BONUS TIME")
-                game_vars.daily_counter -= 1
                 self.outcome = 3
             else:
                 self.outcome = 4
@@ -328,7 +327,7 @@ class Puzzle(commands.Cog):
                 )
                 return
 
-            self.bonus = game_vars.daily_counter > 0 and random.randrange(10) == 9
+            self.bonus = random.randrange(10) < 3
 
             self.coin_value = coin_value
 

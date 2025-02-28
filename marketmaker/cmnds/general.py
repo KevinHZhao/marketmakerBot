@@ -9,11 +9,11 @@ import discord
 from discord.ext import commands
 
 from marketmaker.backend.db import (
+    bonus_transfer,
     build_ledger,
     build_timetrial,
     fetch_used_words,
     fetch_wallet_amount,
-    bonus_transfer,
 )
 from marketmaker.used_menus import MyMenuPages, MySource
 
@@ -22,7 +22,7 @@ class General(commands.Cog):
     def __init__(self: General, bot) -> None:
         self.bot = bot
 
-    
+
     @commands.hybrid_command(name="beg")
     async def cmd_beg(self: General, ctx) -> None:
         """
@@ -34,7 +34,7 @@ class General(commands.Cog):
             await ctx.send(f"{ctx.author}, you poor thing.  Fine, you can have a bonus dollar.")
         else:
             await ctx.send(f"{ctx.author} you've still got money to spend!  Come back when you've actually hit rock bottom.")
-        
+
 
     @commands.hybrid_command(name="wallet")
     async def cmd_wallet(self: General, ctx, target: discord.Member = None) -> None:
@@ -151,7 +151,7 @@ class General(commands.Cog):
             5: " as a donation.",  # send/donate
             6: " as taxes.",  # tax
             7: " as a wager.",  # random
-            8: " as a bonus.",  # force_inflation
+            8: " as a bonus.",  # rand_inflation
             9: " due to deflation.",  # force_deflataion
         }
 
@@ -240,8 +240,8 @@ class General(commands.Cog):
         buffed_value = min(math.ceil(wager*1.5), bank_money - 1)
         buffed_puzzle = partial(puzzle.spawn_puzzle, channel = ctx.channel, game_vars = self.bot.game_vars, coin_value = buffed_value, bonus_value = 500)
 
-        deflation = partial(eco.force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager*2/3))
-        inflation = partial(eco.force_inflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager/2))
+        deflation = partial(eco.force_deflation, channel = ctx.channel, user = ctx.author, amount = math.ceil(wager))
+        inflation = partial(eco.rand_inflation, channel = ctx.channel, user = ctx.author, wager = wager, amount = math.ceil(wager/2))
         dono = min(math.ceil(wager/2), user_money)
         bank_donation = partial(eco.donation, channel = ctx.channel, sender = ctx.author, receiver = "BANK", amount = dono)
 

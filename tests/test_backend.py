@@ -21,4 +21,3 @@ def test_setup_bomb(bot: MarketmakerBot, event_loop):
 
     test1_result = setup_bomb(bot.game_vars, True, bot.normal_min_words, bot.hard_min_words)
     assert bot.game_vars.seeking_substr in hard_substrings
-    assert bot.game_vars.daily_counter == 2

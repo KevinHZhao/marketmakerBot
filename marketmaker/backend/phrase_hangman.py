@@ -89,7 +89,7 @@ class HangmanBackend:
         if not word:
             return False
         return word.lower() == self.answer.lower()
-    
+
     def finish(self, coin_value: int, winid: int | None = None, bonus_prize: int | None = None, vicid: int | Literal["BANK"] = "BANK"):
         if winid is None:
             if vicid != "BANK":

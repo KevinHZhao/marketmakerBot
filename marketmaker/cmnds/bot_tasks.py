@@ -22,7 +22,6 @@ class BotTasks(commands.Cog):
     @tasks.loop(time=time)
     async def daily_events(self: BotTasks) -> None:
         print("Daily reset!")
-        self.bot.game_vars.daily_counter = 3
 
         channel: discord.TextChannel = await self.bot.fetch_channel(int(self.bot.channelid))
 

@@ -42,15 +42,17 @@ class Economy(commands.Cog):
         bonus_transfer("BANK", -amount, 9)
 
 
-    async def force_inflation(
+    async def rand_inflation(
         self: Economy,
         channel: discord.TextChannel,
         user: discord.Member,
+        wager: int,
         amount: int,
     ):
         await channel.send(
-            f"Inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet!  The economy grows by {amount}$.",
+            f"Inflation!  {amount}$ has appeared from out of nowhere into {user.mention}'s wallet, and they get their wager back!  The economy grows by {amount}$.",
         )
+        wallet_transfer_backend("BANK", user.id, wager, 8)
         bonus_transfer(user.id, amount, 8)
 
 

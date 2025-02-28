@@ -75,6 +75,7 @@ class Puzzle(commands.Cog):
             self.ph.build_guide()
 
         if winmsg is None:
+            await channel.send(f"The phrase was `{self.ph.answer}`!", delete_after=10)
             await self.failed(game_vars, channel)
         else:
             await winmsg.add_reaction("👍")

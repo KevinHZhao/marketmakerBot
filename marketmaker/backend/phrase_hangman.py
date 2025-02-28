@@ -58,7 +58,7 @@ class HangmanBackend:
     def build_guide(self) -> str:
         blanks = self.guide.count("_")
         if blanks >= 2:
-            maxhints = math.floor(blanks / 3)
+            maxhints = math.floor(blanks / 2)
             replace = list(set(random.choices(range(len(self.answer)), k = maxhints)))
             self.guide = "".join([self.answer[i] if i in replace else self.guide[i] for i in range(len(self.guide))])
         return self.guide
@@ -104,5 +104,5 @@ class HangmanBackend:
         elif winid != vicid:
             wallet_transfer_backend(sendid = "BANK", recid = winid, amount = coin_value, transaction = 2)
 
-        if bonus_prize and winid is not None:
+        if bonus_prize is not None and winid is not None:
             bonus_transfer(winid, bonus_prize)

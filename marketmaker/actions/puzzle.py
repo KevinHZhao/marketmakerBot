@@ -58,7 +58,7 @@ class Puzzle(commands.Cog):
             return {
                 1: f"{vicmen}, all {self.coin_value}$ from your wallet has spawned, unlucky!  Anyone can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
                 2: f"The bank's looking pretty empty, so instead, :coin: Coins :coin: from {victim}'s wallet have spawned, valued at {self.coin_value}$!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
-                3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value}$ plus another {bonus_value}$ per word in the streak!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
+                3: f":dollar: Bonus Coins :dollar: have spawned, valued at {self.coin_value}$ plus another {bonus_value}$ as bonus!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
                 4: f":coin: Coins :coin: from the bank have spawned, valued at {self.coin_value}$!  You can claim them by deciphering this {self.ph.phrase_type.lower()} within {time_left} seconds:\n`{self.ph.guide.lower()}`",
             }
 

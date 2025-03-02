@@ -126,6 +126,7 @@ class General(commands.Cog):
             # StatType.Deflation: "The users who've deflated the economy the most are:\n",
             StatType.Random: "The users who've wagered the most through the random command are:\n",
             StatType.Puzzle: "The users who've earned the most from puzzles are:\n",
+            StatType.Donation: "The users who've donated the most to others are:\n",
         }
 
         if board is None:

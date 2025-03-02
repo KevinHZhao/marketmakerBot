@@ -267,8 +267,8 @@ def build_board(stat: StatType) -> list:
     tt.loc[negative_amounts, 'amount'] = -tt.loc[negative_amounts, 'amount']
 
     sendrec_pre = {
-        (StatType.Tax, StatType.Donation, StatType.Money, StatType.Puzzle, StatType.Random): "sender",
-        (StatType.Inflation, ) : "receiver",
+        (StatType.Tax, StatType.Donation, StatType.Money, StatType.Random): "sender",
+        (StatType.Inflation, StatType.Puzzle) : "receiver",
     }
 
     sendrec = {}

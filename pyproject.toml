@@ -14,6 +14,7 @@ dependencies = [
     "numpy",         # saving int lists
     "pytz",          # timezone
     "pyyaml",        # reading yaml of pokemon moves
+    "pandas",        # database postprocessing
     "discord-ext-menus @ git+https://github.com/Rapptz/discord-ext-menus", # discord menus
 ]
 requires-python = ">=3.11"

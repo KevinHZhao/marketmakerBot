@@ -4,18 +4,17 @@ import math
 import random
 from functools import partial
 from typing import Literal
-from enum import Enum
 
 import discord
 from discord.ext import commands
 
 from marketmaker.backend.db import (
+    StatType,
     bonus_transfer,
     build_ledger,
     build_timetrial,
     fetch_used_words,
     fetch_wallet_amount,
-    StatType,
 )
 from marketmaker.used_menus import MyMenuPages, MySource
 

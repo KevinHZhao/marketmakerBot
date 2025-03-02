@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 from discord.ext import commands
 
 from marketmaker.backend.db import (
+    StatType,
+    build_board,
     leaderboard_backend,
     reset_timer_board_backend,
-    build_board,
-    StatType,
 )
 
 if TYPE_CHECKING:

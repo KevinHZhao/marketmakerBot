@@ -104,5 +104,5 @@ class HangmanBackend:
         elif winid != vicid:
             wallet_transfer_backend(sendid = "BANK", recid = winid, amount = coin_value, transaction = 2)
 
-        if bonus_prize is not None and winid is not None:
+        if bonus_prize is not None and winid is not None and bonus_prize != 0:
             bonus_transfer(winid, bonus_prize)

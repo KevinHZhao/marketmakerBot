@@ -7,6 +7,8 @@ from discord.ext import commands
 from marketmaker.backend.db import (
     leaderboard_backend,
     reset_timer_board_backend,
+    build_board,
+    StatType,
 )
 
 if TYPE_CHECKING:
@@ -33,3 +35,11 @@ class Leaderboard(commands.Cog):
             board += f"{i + 1}. {await self.bot.fetch_user(row[0])}: {row[1]}$\n"
 
         return board
+
+
+    async def ledger_board(self: Leaderboard, stat: StatType) -> None | str:
+        table = build_board(stat)
+        if table is None:
+            return None
+
+        return "\n".join([f"{i+1}. {await self.bot.fetch_user(row['sender'])}: {row['amount']}$" for i, row in table.iterrows()])

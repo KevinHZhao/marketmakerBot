@@ -4,6 +4,7 @@ import math
 import random
 from functools import partial
 from typing import Literal
+from enum import Enum
 
 import discord
 from discord.ext import commands
@@ -14,6 +15,7 @@ from marketmaker.backend.db import (
     build_timetrial,
     fetch_used_words,
     fetch_wallet_amount,
+    StatType,
 )
 from marketmaker.used_menus import MyMenuPages, MySource
 
@@ -108,16 +110,29 @@ class General(commands.Cog):
 
 
     @commands.hybrid_command(name="leaderboard")
-    async def cmd_leaderboard(self: General, ctx) -> None:
+    async def cmd_leaderboard(self: General, ctx, stat: StatType = StatType.Money) -> None:
         """
         Displays a leaderboard of up to ten users based on their current wallet.
         """
         lb = self.bot.get_cog("Leaderboard")
-        board = await lb.build_leaderboard()
-        print(board)
-        if board is None:
-            await ctx.channel.send("Nobody on the leaderboard!")
+        if stat.value == "MONEY":
+            board = await lb.build_leaderboard()
         else:
+            board = await lb.ledger_board(stat)
+
+        predict = {
+            StatType.Money: "The current richest users are:\n",
+            StatType.Tax: "The users who've paid the most in taxes are:\n",
+            StatType.Inflation: "The users who've inflated the economy the most are:\n",
+            # StatType.Deflation: "The users who've deflated the economy the most are:\n",
+            StatType.Random: "The users who've wagered the most through the random command are:\n",
+            StatType.Puzzle: "The users who've earned the most from puzzles are:\n",
+        }
+
+        if board is None:
+            await ctx.channel.send("Nobody on that leaderboard!")
+        else:
+            board = predict[stat] + board
             await ctx.send(board)
 
 

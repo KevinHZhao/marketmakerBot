@@ -6,10 +6,22 @@ import random
 import sqlite3
 from pathlib import Path
 from typing import Literal
+from enum import Enum
+import pandas as pd
 
 from pytz import timezone
 
 DB_PATH = Path("marketmaker.db")  # relative to executable
+
+
+class StatType(Enum):
+    Tax = "6"
+    # Deflation = "9"
+    Inflation = "1, 8"
+    Random = "7"
+    Donation = "5"
+    Puzzle = "2"
+    Money = "MONEY"
 
 
 def generate_victim() -> tuple[str, int]:
@@ -19,7 +31,7 @@ def generate_victim() -> tuple[str, int]:
     cur.execute("""
     SELECT ID, cash
     FROM wallets
-    WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 1            
+    WHERE ID NOT IN ("BANK", "TOTAL") AND cash > 1
     """)
     rows = cur.fetchall()
     economy.close()
@@ -230,6 +242,35 @@ def build_ledger(targetid: int | Literal["BANK"]) -> list:
     return rows
 
 
+def build_board(stat: StatType) -> list:
+
+    economy = sqlite3.connect("marketmaker.db")
+
+    tt = pd.read_sql_query(
+    ("""
+    SELECT sender, receiver, amount
+    FROM ledger
+    WHERE type IN (?)
+    """),
+    economy,
+    params = stat.value,
+    )
+    economy.close()
+
+    # Identify rows with negative amounts
+    negative_amounts = tt['amount'] < 0
+
+    # Swap sender and receiver for negative amounts
+    tt.loc[negative_amounts, ['sender', 'receiver']] = tt.loc[negative_amounts, ['receiver', 'sender']].values
+
+    # Change the sign of the negative amounts
+    tt.loc[negative_amounts, 'amount'] = -tt.loc[negative_amounts, 'amount']
+    taxboard = tt.groupby("sender").sum().sort_values("amount", ascending=False).head(10)
+
+    taxboard.reset_index(inplace = True)
+    return taxboard
+
+
 def build_timetrial() -> list:
     economy = sqlite3.connect("marketmaker.db")
     cur = economy.cursor()
@@ -243,7 +284,7 @@ def build_timetrial() -> list:
     LIMIT 3
     """)
 
-    rows =  cur.fetchall()
+    rows = cur.fetchall()
 
     economy.commit()
     economy.close()

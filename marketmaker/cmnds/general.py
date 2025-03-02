@@ -115,7 +115,7 @@ class General(commands.Cog):
         Displays a leaderboard of up to ten users based on their current wallet.
         """
         lb = self.bot.get_cog("Leaderboard")
-        if stat.value == "MONEY":
+        if stat.value == ["M"]:
             board = await lb.build_leaderboard()
         else:
             board = await lb.ledger_board(stat)

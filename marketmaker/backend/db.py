@@ -4,24 +4,24 @@ import datetime
 import math
 import random
 import sqlite3
+from enum import Enum
 from pathlib import Path
 from typing import Literal
-from enum import Enum
-import pandas as pd
 
+import pandas as pd
 from pytz import timezone
 
 DB_PATH = Path("marketmaker.db")  # relative to executable
 
 
 class StatType(Enum):
-    Tax = "6"
+    Tax = [6]
     # Deflation = "9"
-    Inflation = "1, 8"
-    Random = "7"
-    Donation = "5"
-    Puzzle = "2"
-    Money = "MONEY"
+    Inflation = [1, 8]
+    Random = [7]
+    Donation = [5]
+    Puzzle = [2]
+    Money = ["M"]
 
 
 def generate_victim() -> tuple[str, int]:
@@ -247,13 +247,13 @@ def build_board(stat: StatType) -> list:
     economy = sqlite3.connect("marketmaker.db")
 
     tt = pd.read_sql_query(
-    ("""
+    """
     SELECT sender, receiver, amount
     FROM ledger
-    WHERE type IN (?)
-    """),
+    WHERE type IN ({})
+    """.format(','.join(['?'] * len(stat.value))),
     economy,
-    params = stat.value,
+    params = tuple(stat.value),
     )
     economy.close()
 
@@ -265,10 +265,19 @@ def build_board(stat: StatType) -> list:
 
     # Change the sign of the negative amounts
     tt.loc[negative_amounts, 'amount'] = -tt.loc[negative_amounts, 'amount']
-    taxboard = tt.groupby("sender").sum().sort_values("amount", ascending=False).head(10)
 
-    taxboard.reset_index(inplace = True)
-    return taxboard
+    sendrec_pre = {
+        (StatType.Tax, StatType.Donation, StatType.Money, StatType.Puzzle, StatType.Random): "sender",
+        (StatType.Inflation, ) : "receiver",
+    }
+
+    sendrec = {}
+    for k, v in sendrec_pre.items():
+        for key in k:
+            sendrec[key] = v
+
+    taxboard = tt.groupby(sendrec[stat]).sum().query(f'{sendrec[stat]} != "BANK"').sort_values("amount", ascending=False).head(10).reset_index()
+    return pd.DataFrame({"Winner": taxboard[sendrec[stat]], "Amount": taxboard["amount"]})
 
 
 def build_timetrial() -> list:

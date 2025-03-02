@@ -42,4 +42,4 @@ class Leaderboard(commands.Cog):
         if table is None:
             return None
 
-        return "\n".join([f"{i+1}. {await self.bot.fetch_user(row['sender'])}: {row['amount']}$" for i, row in table.iterrows()])
+        return "\n".join([f"{i+1}. {await self.bot.fetch_user(row['Winner'])}: {row['Amount']}$" for i, row in table.iterrows()])

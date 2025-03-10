@@ -349,7 +349,7 @@ class Puzzle(commands.Cog):
             bp = partial(self.spawn_bp, vicmen, game_vars, victim, channel, bonus_value * 2)
             lb = partial(self.spawn_lb, vicmen, game_vars, victim, channel, bonus_value)
             ph = partial(self.spawn_ph, vicmen, game_vars, victim, channel, bonus_value * 2)
-            weights = (0.1, 0.1, 0.8) ## Want to debug the ph puzzle on prod...
+            weights = (1/3, 1/3, 1/3)
 
             funcs = [bp, lb, ph]
             selected_fun = random.choices(funcs, weights = weights, k = 1)[0]

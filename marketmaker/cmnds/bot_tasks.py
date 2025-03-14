@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import random
 from typing import TYPE_CHECKING
+import zoneinfo
 
 import discord
 from discord.ext import commands, tasks
@@ -10,7 +11,7 @@ from discord.ext import commands, tasks
 if TYPE_CHECKING:
     from marketmaker.subclass import GameVars
 
-time = datetime.time(hour=5, minute=0, tzinfo=datetime.UTC)
+time = datetime.time(hour=0, minute=0, tzinfo=zoneinfo.ZoneInfo("Canada/Eastern"))
 
 class BotTasks(commands.Cog):
     def __init__(self: BotTasks, bot) -> None:

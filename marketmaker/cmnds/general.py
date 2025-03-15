@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 from functools import partial
-from typing import Literal
+from typing import List, Literal
 
 import discord
 from discord.ext import commands
@@ -22,6 +22,13 @@ from marketmaker.used_menus import MyMenuPages, MySource
 class General(commands.Cog):
     def __init__(self: General, bot) -> None:
         self.bot = bot
+
+
+    async def wager_autocomplete(self, interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice]:
+        user_money = fetch_wallet_amount(interaction.user.id)
+        return [
+            discord.app_commands.Choice(name=f"Your current money: {user_money}$", value=str(user_money))
+        ]
 
 
     @commands.hybrid_command(name="beg")
@@ -216,6 +223,7 @@ class General(commands.Cog):
 
 
     @commands.hybrid_command(name="random")
+    @discord.app_commands.autocomplete(wager = wager_autocomplete)
     async def cmd_random_event(self: General, ctx, wager: int | None = None) -> None:
         """
         Causes a random event to occur, requires a wager rom the user.
@@ -234,8 +242,11 @@ class General(commands.Cog):
             )
             return
 
+        if wager == "all":
+            wager = user_money
+
         assert isinstance(wager, int)
-        if wager > user_money:
+        if wager > user_money or wager == 0:
             await ctx.send(
                 f"{ctx.author.mention}, you don't have enough money for that wager!",
             )

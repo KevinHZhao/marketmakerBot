@@ -55,12 +55,17 @@ class HangmanBackend:
         self.build_guide()
 
 
+    def get_uscore_indices(self) -> list[int]:
+        return [i for i, char in enumerate(self.guide) if char == "_"]
+
+
     def build_guide(self) -> str:
         blanks = self.guide.count("_")
         if blanks >= 2:
-            maxhints = math.floor(blanks / 2)
-            replace = list(set(random.choices(range(len(self.answer)), k = maxhints)))
-            self.guide = "".join([self.answer[i] if i in replace else self.guide[i] for i in range(len(self.guide))])
+            maxhints = math.floor(blanks / 3)
+            if "_" in self.guide:
+                replace = list(set(random.choices(self.get_uscore_indices(), k = maxhints)))
+                self.guide = "".join([self.answer[i] if i in replace else self.guide[i] for i in range(len(self.guide))])
         return self.guide
 
 

@@ -130,7 +130,7 @@ class General(commands.Cog):
             StatType.Money: "The current richest users are:\n",
             StatType.Tax: "The users who've paid the most in taxes are:\n",
             StatType.Inflation: "The users who've inflated the economy the most are:\n",
-            # StatType.Deflation: "The users who've deflated the economy the most are:\n",
+            StatType.Deflation: "The users who've deflated the economy the most (by estimation) are:\n",
             StatType.Random: "The users who've wagered the most through the random command are:\n",
             StatType.Puzzle: "The users who've earned the most from puzzles are:\n",
             StatType.Donation: "The users who've donated the most to others are:\n",

@@ -16,7 +16,7 @@ DB_PATH = Path("marketmaker.db")  # relative to executable
 
 class StatType(Enum):
     Tax = [6]
-    # Deflation = "9"
+    Deflation = ["DEFLATION"]
     Inflation = [1, 8]
     Random = [7]
     Donation = [5]
@@ -242,10 +242,47 @@ def build_ledger(targetid: int | Literal["BANK"]) -> list:
     return rows
 
 
+def build_deflation_board() -> list:
+    economy = sqlite3.connect("marketmaker.db")
+    tt = pd.read_sql_query(
+    """
+    SELECT sender, receiver, amount, type
+    FROM ledger
+    WHERE type IN (7, 9)
+    """,
+    economy,
+    )
+    economy.close()
+
+    deflation_rows = tt[(tt['amount'] < 0) & (tt["type"] == 9) & (tt["receiver"] == "BANK")]
+    new_rows = []
+
+    for idx, row in deflation_rows.iterrows():
+        # Find the closest row above with type 7, receiver is BANK, and amount is -amount of type 9 row
+        condition = (tt.index < idx) & (tt['type'] == 7) & (tt['receiver'] == 'BANK') & (tt['amount'] == -row['amount'])
+        closest_row = tt[condition].iloc[-1:]  # Get the last (closest) row that matches the condition
+        if not closest_row.empty:
+            new_rows.append(closest_row)
+
+    # Concatenate the new rows into a new DataFrame
+    df = pd.concat(new_rows)
+
+    # Swap the receiver and sender columns
+    df = df.copy()
+    df[['sender', 'receiver']] = df[['receiver', 'sender']]
+    additional_rows = tt[(tt["type"] == 9) & (tt["receiver"] != "BANK")]
+    additional_rows.loc[:, 'amount'] = -additional_rows['amount']  # Flip the sign of the amount column
+    df = pd.concat([df, additional_rows])
+
+    finalboard = df.groupby("receiver").sum().sort_values("amount", ascending=False).head(10).reset_index()
+    return pd.DataFrame({"Winner": finalboard["receiver"], "Amount": finalboard["amount"]})
+
 def build_board(stat: StatType) -> list:
 
-    economy = sqlite3.connect("marketmaker.db")
+    if stat == StatType.Deflation:
+        return build_deflation_board()
 
+    economy = sqlite3.connect("marketmaker.db")
     tt = pd.read_sql_query(
     """
     SELECT sender, receiver, amount
@@ -276,8 +313,8 @@ def build_board(stat: StatType) -> list:
         for key in k:
             sendrec[key] = v
 
-    taxboard = tt.groupby(sendrec[stat]).sum().query(f'{sendrec[stat]} != "BANK"').sort_values("amount", ascending=False).head(10).reset_index()
-    return pd.DataFrame({"Winner": taxboard[sendrec[stat]], "Amount": taxboard["amount"]})
+    finalboard = tt.groupby(sendrec[stat]).sum().query(f'{sendrec[stat]} != "BANK"').sort_values("amount", ascending=False).head(10).reset_index()
+    return pd.DataFrame({"Winner": finalboard[sendrec[stat]], "Amount": finalboard["amount"]})
 
 
 def build_timetrial() -> list:

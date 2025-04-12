@@ -24,7 +24,7 @@ def ensure_db() -> None:
     cur.execute("CREATE TABLE IF NOT EXISTS wallets(ID TEXT, cash INTEGER DEFAULT 0)")
     cur.execute("CREATE TABLE IF NOT EXISTS used_words(word TEXT)")
     cur.execute("CREATE TABLE IF NOT EXISTS ledger(time TIMESTAMP, sender TEXT, receiver TEXT, amount INTEGER, type INTEGER)")
-    cur.execute("CREATE TABLE IF NOT EXISTS futures(ID INTEGER, CID INTEGER, init_economy INTEGER, end TIMESTAMP, premium INTEGER, target_growth INTEGER, return_rate FLOAT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS futures(ID INTEGER, CID INTEGER, init_economy INTEGER, duration INTEGER, end TIMESTAMP, premium INTEGER, target_growth INTEGER)")
     if not DB_PATH.exists():
         cur.execute(
             """

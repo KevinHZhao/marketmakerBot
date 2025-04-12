@@ -25,7 +25,7 @@ def create_futures(
     conn = sqlite3.connect("marketmaker.db")
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT ID, CID, init_economy, premium, target_growth, return_rate
+    SELECT *
     FROM futures
     WHERE id = ?
     """, (user_id,))
@@ -54,8 +54,8 @@ def create_futures(
     total_money = fetch_wallet_amount("TOTAL")
     end = timestamp + duration
 
-    return_rate = (0.1 + math.log2(1 + abs(target_growth)/100)) * (1 + 0.5 * math.log2(1 + duration.seconds / 3600) ** 1.5) * bet/250
-    break_even_growth = math.ceil(target_growth + bet/return_rate)
+    max_gain = round((1 + math.log2(1 + abs(target_growth)/(total_money+bet))) * (1 + 0.5 * math.log2(1 + duration.total_seconds() / 3600) ** 1.5) * bet)
+    break_even_growth = math.ceil(-math.log(2 * max_gain / (bet + max_gain) - 1)*10/(0.1 + math.log2(1 + abs(target_growth)/(total_money+bet))))
 
     conn = sqlite3.connect("marketmaker.db")
     cursor = conn.cursor()
@@ -63,34 +63,37 @@ def create_futures(
     # Insert the futures contract into the database
     cursor.execute(
         """
-        INSERT INTO futures (ID, CID, init_economy, end, premium, target_growth, return_rate)
+        INSERT INTO futures (ID, CID, init_economy, duration, end, premium, target_growth)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (user_id, channel_id, total_money, end, bet, target_growth, return_rate),
+        (user_id, channel_id, total_money, int(duration.total_seconds()), end, bet, target_growth),
     )
 
     conn.commit()
     conn.close()
 
-    return f"You have wagered {bet}$ for the economy to {"grow" if target_growth > 0 else "shrink"} by {abs(target_growth)}$ on {(timestamp + duration).strftime("%Y-%m-%d %H:%M")}.\nFor every 100$ the economy deviates past {abs(target_growth)}$ from its current value of {total_money}$, you will gain roughly {round(return_rate*100)}$.\nYour break-even point is {"an inflation" if target_growth > 0 else "a deflation"} of {break_even_growth}$."
+    return f"You have wagered {bet}$ for the economy to {"grow" if target_growth > 0 else "shrink"} by {abs(target_growth)}$ on {(timestamp + duration).strftime("%Y-%m-%d %H:%M")}.\nYou can gain at most {max_gain}$ from this wager, for a maximum profit of {max_gain - bet}$.\nYour break-even point is {"an inflation" if target_growth > 0 else "a deflation"} of {abs(target_growth + break_even_growth)}$ on the current economy of {total_money}$."
 
 
 def resolve_futures(
     user_id: int,
     init_economy,
     target_growth,
-    return_rate,
+    bet,
+    duration,
 ):
     final_economy = fetch_wallet_amount("TOTAL")
     strike = init_economy + target_growth
     if target_growth > 0:
-        final_return = max(math.floor((final_economy - strike) * return_rate), 0)
+        final_diff = max(final_economy - strike, 0)
     else:
-        final_return = max(math.floor((strike - final_economy) * return_rate), 0)
+        final_diff = max(strike - final_economy, 0)
 
-    if final_return == 0:
+    if final_diff == 0:
         return 0
     else:
+        max_gain = round((1 + math.log2(1 + abs(target_growth)/(init_economy+bet))) * (1 + 0.5 * math.log2(1 + duration.total_seconds() / 3600) ** 1.5) * bet)
+        final_return = round(2 * max_gain / (1 + math.exp(-final_diff*(0.1 + math.log2(1 + abs(target_growth)/(init_economy+bet)))/10)) - max_gain)
         bonus_transfer(user_id, final_return, 13 if target_growth > 0 else 12)
         return final_return
 

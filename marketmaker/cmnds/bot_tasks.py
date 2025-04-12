@@ -67,7 +67,7 @@ class BotTasks(commands.Cog):
 
         # Fetch events that are due
         cur.execute("""
-        SELECT ID, CID, init_economy, premium, target_growth, return_rate
+        SELECT ID, CID, init_economy, duration, premium, target_growth
         FROM futures
         WHERE end <= ?
         """, (current_time,))
@@ -75,14 +75,14 @@ class BotTasks(commands.Cog):
         events = cur.fetchall()
 
         for event in events:
-            user_id, channel_id, init_economy, premium, target_growth, return_rate = event
-            payout = resolve_futures(user_id, init_economy, target_growth, return_rate)
+            user_id, channel_id, init_economy, duration, bet, target_growth = event
+            payout = resolve_futures(user_id, init_economy, target_growth, bet, duration)
 
             # Send the event message to the channel
             channel = await self.bot.fetch_channel(int(channel_id))
             user = await self.bot.fetch_user(int(user_id))
             if channel:
-                await channel.send(f"{user.mention}, your {premium}$ {"put for the economy to deflate" if target_growth < 0 else "call for the economy to inflate"} by {abs(target_growth)} has expired! You have received {payout}$, resulting in a net {"gain" if payout >= premium else "loss"} of {abs(payout - premium)}$!")
+                await channel.send(f"{user.mention}, your {premium}$ {"put for the economy to deflate" if target_growth < 0 else "call for the economy to inflate"} by {abs(target_growth)}$ has expired! You have received {payout}$, resulting in a net {"gain" if payout >= premium else "loss"} of {abs(payout - premium)}$!")
 
             # Remove these events from the database
             cur.execute("DELETE FROM futures WHERE ID = ?", (user_id,))

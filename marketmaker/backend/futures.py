@@ -72,7 +72,7 @@ def create_futures(
     conn.commit()
     conn.close()
 
-    return f"You have wagered {bet}$ for the economy to {"grow" if target_growth > 0 else "shrink"} by {abs(target_growth)}$ on {(timestamp + duration).strftime("%Y-%m-%d %H:%M")}.\nYou can gain at most {max_gain}$ from this wager, for a maximum profit of {max_gain - bet}$.\nYour break-even point is {"an inflation" if target_growth > 0 else "a deflation"} of {abs(target_growth + break_even_growth)}$ on the current economy of {total_money}$."
+    return f"You have wagered {bet}$ for the economy to {"grow" if target_growth > 0 else "shrink"} by {abs(target_growth)}$ on {(timestamp + duration).strftime("%Y-%m-%d %H:%M")}.\nYou can gain at most {max_gain}$ from this wager, for a maximum profit of {max_gain - bet}$.\nYour break-even point is {"an inflation" if target_growth > 0 else "a deflation"} of {abs(target_growth) + abs(break_even_growth)}$ on the current economy of {total_money}$."
 
 
 def resolve_futures(

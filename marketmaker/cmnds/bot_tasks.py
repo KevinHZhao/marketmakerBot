@@ -82,7 +82,7 @@ class BotTasks(commands.Cog):
             channel = await self.bot.fetch_channel(int(channel_id))
             user = await self.bot.fetch_user(int(user_id))
             if channel:
-                await channel.send(f"{user.mention}, your {premium}$ {"put for the economy to deflate" if target_growth < 0 else "call for the economy to inflate"} by {abs(target_growth)}$ has expired! You have received {payout}$, resulting in a net {"gain" if payout >= premium else "loss"} of {abs(payout - premium)}$!")
+                await channel.send(f"{user.mention}, your {bet}$ {"put for the economy to deflate" if target_growth < 0 else "call for the economy to inflate"} by {abs(target_growth)}$ has expired! You have received {payout}$, resulting in a net {"gain" if payout >= bet else "loss"} of {abs(payout - bet)}$!")
 
             # Remove these events from the database
             cur.execute("DELETE FROM futures WHERE ID = ?", (user_id,))

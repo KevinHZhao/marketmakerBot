@@ -36,7 +36,7 @@ def create_futures(
         return "You already have an ongoing option, wait for it to expire or cancel it with /canceloption."
 
     timestamp = datetime.now(timezone("US/Eastern"))
-    if duration < timedelta(minutes = 0.1):
+    if duration < timedelta(minutes = 15):
         return "All futures must be at least 15 minutes."
 
     if bet < 10:

@@ -63,7 +63,7 @@ class General(commands.Cog):
     @discord.app_commands.describe(
         premium="The amount of money you wish to bet.",
         minimum_inflation="The minimum inflation before you receive anything back.  Larger values are riskier but provide more yield.",
-        duration="The duration you will wait before your put is executed in hours.  Larger values are riskier but provide more yield."
+        duration="The duration you will wait before your call is executed in hours.  Larger values are riskier but provide more yield."
     )
     async def cmd_call(self: General, ctx, premium: int, minimum_inflation: int, duration: float) -> None:
         """

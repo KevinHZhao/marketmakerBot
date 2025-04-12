@@ -92,7 +92,7 @@ def resolve_futures(
     if final_diff == 0:
         return 0
     else:
-        max_gain = round((1 + math.log2(1 + abs(target_growth)/(init_economy+bet))) * (1 + 0.5 * math.log2(1 + duration.total_seconds() / 3600) ** 1.5) * bet)
+        max_gain = round((1 + math.log2(1 + abs(target_growth)/(init_economy+bet))) * (1 + 0.5 * math.log2(1 + duration / 3600) ** 1.5) * bet)
         final_return = round(2 * max_gain / (1 + math.exp(-final_diff*(0.1 + math.log2(1 + abs(target_growth)/(init_economy+bet)))/10)) - max_gain)
         bonus_transfer(user_id, final_return, 13 if target_growth > 0 else 12)
         return final_return

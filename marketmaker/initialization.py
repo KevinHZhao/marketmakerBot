@@ -19,12 +19,13 @@ DB_PATH = Path("marketmaker.db")  # relative to executable
 
 def ensure_db() -> None:
     """Ensures that the storage database exists and is initialized."""
+    economy = sqlite3.connect(DB_PATH)
+    cur = economy.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS wallets(ID TEXT, cash INTEGER DEFAULT 0)")
+    cur.execute("CREATE TABLE IF NOT EXISTS used_words(word TEXT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS ledger(time TIMESTAMP, sender TEXT, receiver TEXT, amount INTEGER, type INTEGER)")
+    cur.execute("CREATE TABLE IF NOT EXISTS futures(ID INTEGER, CID INTEGER, init_economy INTEGER, end TIMESTAMP, premium INTEGER, target_growth INTEGER, return_rate FLOAT)")
     if not DB_PATH.exists():
-        economy = sqlite3.connect(DB_PATH)
-        cur = economy.cursor()
-        cur.execute("CREATE TABLE wallets(ID TEXT, cash INTEGER DEFAULT 0)")
-        cur.execute("CREATE TABLE used_words(word TEXT)")
-        cur.execute("CREATE TABLE ledger(time TIMESTAMP, sender TEXT, receiver TEXT, amount INTEGER, type INTEGER)")
         cur.execute(
             """
             INSERT INTO wallets VALUES
@@ -33,8 +34,8 @@ def ensure_db() -> None:
         """,
             (STARTING_MONEY, STARTING_MONEY),
         )
-        economy.commit()
-        economy.close()
+    economy.commit()
+    economy.close()
 
 
 def num_member_words(substr: str, word_list: list[str]) -> int:

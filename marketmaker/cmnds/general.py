@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+from datetime import timedelta
 from functools import partial
 from typing import List, Literal
 
@@ -16,6 +17,10 @@ from marketmaker.backend.db import (
     fetch_used_words,
     fetch_wallet_amount,
 )
+from marketmaker.backend.futures import (
+    create_futures,
+    cancel_futures
+)
 from marketmaker.used_menus import MyMenuPages, MySource
 
 
@@ -29,7 +34,44 @@ class General(commands.Cog):
         return [
             discord.app_commands.Choice(name=f"Your current money: {user_money}$", value=str(user_money))
         ]
-
+        
+        
+    @commands.hybrid_command(name="canceloption")
+    async def cmd_canceloption(self:General, ctx) -> None:
+        """
+        Cancels the user's current option.  Your premium will not be returned.
+        """
+        cancel_futures(ctx.author.id)
+        await ctx.send("Your option has been cancelled!")
+    
+    
+    @commands.hybrid_command(name="put")
+    @discord.app_commands.describe(
+        premium="The amount of money you wish to bet.",
+        minimum_deflation="The minimum deflation before you receive anything back.  Larger values are riskier but provide more yield.",
+        duration="The duration you will wait before your put is executed in hours.  Larger values are riskier but provide more yield."
+    )
+    async def cmd_put(self: General, ctx, premium: int, minimum_deflation: int, duration: float) -> None:
+        """
+        Creates a put option for the user to bet on.
+        """
+        output = create_futures(ctx.author.id, ctx.channel.id, timedelta(hours = duration), premium, -minimum_deflation)
+        await ctx.send(output)
+    
+    
+    @commands.hybrid_command(name="call")
+    @discord.app_commands.describe(
+        premium="The amount of money you wish to bet.",
+        minimum_inflation="The minimum inflation before you receive anything back.  Larger values are riskier but provide more yield.",
+        duration="The duration you will wait before your put is executed in hours.  Larger values are riskier but provide more yield."
+    )
+    async def cmd_call(self: General, ctx, premium: int, minimum_inflation: int, duration: float) -> None:
+        """
+        Creates a call option for the user to bet on.
+        """
+        output = create_futures(ctx.author.id, ctx.channel.id, timedelta(hours = duration), premium, minimum_inflation)
+        await ctx.send(output)
+    
 
     @commands.hybrid_command(name="beg")
     async def cmd_beg(self: General, ctx) -> None:
@@ -175,6 +217,10 @@ class General(commands.Cog):
             7: " as a wager.",  # random
             8: " as a bonus.",  # rand_inflation
             9: " due to deflation.",  # force_deflataion
+            10: " from a wager for a put option.", # futures
+            11: " from a wager for a call option.", # futures
+            12: " as a return from a put option.", # futures
+            13: " as a return from a call option.", # futures
         }
 
         for row in rows:
@@ -197,9 +243,9 @@ class General(commands.Cog):
             amount = row[3]
             transaction = row[4]
 
-            if transaction in [1, 8]:
+            if transaction in [1, 8, 12, 13]:
                 ledger += f"[{timestamp}] {receiver} received {amount}${transaction_dict[transaction]}\n"
-            elif transaction == 9:
+            elif transaction in [9, 10, 11]:
                 ledger += f"[{timestamp}] {receiver} lost {-amount}${transaction_dict[transaction]}\n"
             else:
                 ledger += f"[{timestamp}] {receiver} received {amount}$ from {sender}{transaction_dict[transaction]}\n"
@@ -335,6 +381,7 @@ class General(commands.Cog):
         """
         eco = self.bot.get_cog("Economy")
         if self.bot.dev:
+            bonus_transfer(ctx.author.id, 10000)
             bank_money = fetch_wallet_amount("BANK")
             await eco.wallet_transfer("BANK", ctx.author, math.ceil(0.99 * bank_money), ctx.channel, 4)
             await ctx.send("Cheat successful!")

@@ -19,7 +19,8 @@ from marketmaker.backend.db import (
 )
 from marketmaker.backend.futures import (
     create_futures,
-    cancel_futures
+    cancel_futures,
+    view_futures
 )
 from marketmaker.used_menus import MyMenuPages, MySource
 
@@ -43,6 +44,15 @@ class General(commands.Cog):
         """
         cancel_futures(ctx.author.id)
         await ctx.send("Your option has been cancelled!")
+        
+    
+    @commands.hybrid_command(name="viewoption")
+    async def cmd_viewoption(self:General, ctx) -> None:
+        """
+        Displays the user's current option.
+        """
+        msg = view_futures(ctx.author.id)
+        await ctx.send(msg)
     
     
     @commands.hybrid_command(name="put")

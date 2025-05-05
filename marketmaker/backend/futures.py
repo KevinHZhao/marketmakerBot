@@ -38,12 +38,12 @@ def view_futures(user_id: int):
     else:
         final_diff = max(strike - final_economy, 0)
 
+    max_gain = round((1 + math.log2(1 + abs(target_growth)/(init_economy+bet))) * (1 + 0.5 * math.log2(1 + duration / 3600) ** 1.5) * bet)
+
     if final_diff == 0:
         final_return = 0
     else:
         final_return = round(2 * max_gain / (1 + math.exp(-final_diff*(0.1 + math.log2(1 + abs(target_growth)/(init_economy+bet)))/10)) - max_gain)
-    
-    max_gain = round((1 + math.log2(1 + abs(target_growth)/(init_economy+bet))) * (1 + 0.5 * math.log2(1 + duration / 3600) ** 1.5) * bet)
 
     return f"You have a {bet}$ wager for the economy to {'grow' if target_growth > 0 else 'shrink'} {abs(target_growth)}$ by {datetime.fromisoformat(end).strftime('%Y-%m-%d %H:%M')} from its initial size of {init_economy}$.\nCurrently, you are projected to receive {final_return}$ once your contract expires, for a {"profit" if final_return > bet else "loss"} of {abs(final_return - bet)}$.\nThe maximum amount you can profit from this option is {max_gain - bet}$."
 

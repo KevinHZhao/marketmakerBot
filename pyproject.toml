@@ -15,6 +15,9 @@ dependencies = [
     "pytz",          # timezone
     "pyyaml",        # reading yaml of pokemon moves
     "pandas",        # database postprocessing
+    "influxdb-client", # influxdb client
+    "influxdb",    # influxdb
+    "matplotlib", # plotting
     "discord-ext-menus @ git+https://github.com/Rapptz/discord-ext-menus", # discord menus
 ]
 requires-python = ">=3.11"

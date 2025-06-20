@@ -60,7 +60,7 @@ def plotter(results, item: str):
     y1, y2 = primary_ax.get_ylim()
     y1_ratio = (y1 / starting_amount - 1) * 100
     y2_ratio = (y2 / starting_amount - 1) * 100
-    secondary_ax.set_ylim(y1_ratio), y2_ratio) 
+    secondary_ax.set_ylim(y1_ratio, y2_ratio) 
 
     secondary_ax.set_ylabel("% Change")
     
